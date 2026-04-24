@@ -146,11 +146,21 @@
             referrerpolicy="no-referrer-when-downgrade">
           </iframe>
         </div>
+
+        <form class="civic-api-card" id="civic-api-form" aria-labelledby="civic-api-title">
+          <div class="civic-api-title" id="civic-api-title">Google Civic API Lookup</div>
+          <label for="civic-address-input">Street address</label>
+          <input id="civic-address-input" type="text" autocomplete="street-address" maxlength="160" placeholder="123 Main St, City, State" />
+          <label for="google-api-key-input">Google API key <span>(optional)</span></label>
+          <input id="google-api-key-input" type="password" autocomplete="off" spellcheck="false" maxlength="120" placeholder="Use Civic Information API" />
+          <button class="btn-mini" id="civic-api-btn" type="submit">Check Official Election Info</button>
+          <div class="civic-api-result" id="civic-api-result" role="status" aria-live="polite">Enter an address to open a trusted Google Civic Information lookup.</div>
+        </form>
       </div>
 
       <div class="powered-row">
         <svg viewBox="0 0 24 24" width="11" height="11" fill="rgba(255,255,255,0.25)" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
-        Powered by <a href="https://anthropic.com" target="_blank" rel="noopener noreferrer">Claude AI</a> &amp; <a href="https://fonts.google.com" target="_blank" rel="noopener noreferrer">Google Fonts</a>
+        Powered by <a href="https://anthropic.com" target="_blank" rel="noopener noreferrer">Claude AI</a>, <a href="https://developers.google.com/civic-information" target="_blank" rel="noopener noreferrer">Google Civic Information API</a> &amp; <a href="https://fonts.google.com" target="_blank" rel="noopener noreferrer">Google Fonts</a>
       </div>
     </aside>
 
