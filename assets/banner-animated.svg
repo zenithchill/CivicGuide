@@ -1,0 +1,38 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Background -->
+  <rect width="1200" height="400" fill="#0D1B2A"/>
+
+  <!-- Animated Gradient Glow -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#C8902A" stop-opacity="0.6">
+        <animate attributeName="stop-opacity" values="0.6;0.2;0.6" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#C8902A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="950" cy="200" r="220" fill="url(#glow)">
+    <animate attributeName="r" values="200;240;200" dur="6s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Animated Title -->
+  <text x="80" y="160" font-family="Georgia, serif" font-size="64" fill="white" font-weight="bold">
+    CivicGuide
+    <animate attributeName="opacity" values="0;1" dur="1.5s" fill="freeze"/>
+  </text>
+
+  <!-- Subtitle -->
+  <text x="80" y="220" font-family="Arial, sans-serif" font-size="24" fill="#F0B44A">
+    AI-Powered Election Education Platform
+    <animate attributeName="opacity" values="0;1" dur="2.5s" fill="freeze"/>
+  </text>
+
+  <!-- Tagline -->
+  <text x="80" y="270" font-family="Arial, sans-serif" font-size="18" fill="white" opacity="0.85">
+    Understand elections • Learn voting • Make informed decisions
+    <animate attributeName="opacity" values="0;1" dur="3.5s" fill="freeze"/>
+  </text>
+
+</svg>
