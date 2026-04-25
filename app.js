@@ -1,8 +1,27 @@
 /**
- * CivicGuide — Election Process Education Assistant
- * Integrations: Claude AI · Google Maps JS API · Google Places Autocomplete
- *               Google Civic Information API · Google Calendar · Google Translate
- *               Firebase Analytics · Firebase Firestore
+ * CivicGuide v2.0.0 — Election Process Education Assistant
+ *
+ * Google Integrations:
+ *   • Google Maps JS API (interactive polling-place map, geolocation)
+ *   • Google Places Autocomplete (address lookup with markers)
+ *   • Google Places Nearby Search (polling places near user)
+ *   • Google Civic Information API (official voter info by address)
+ *   • Google Calendar (deep-link event creation)
+ *   • Google Search (dynamic election queries)
+ *   • Google Translate (multi-language support)
+ *   • Google Fonts (Cormorant Garamond, Outfit)
+ *   • Google YouTube (region-specific video search links)
+ *
+ * Firebase Integrations:
+ *   • Firebase Analytics — logEvent for all key user actions
+ *   • Firebase Analytics — setUserProperties for region/mode
+ *   • Firebase Firestore — store session question logs
+ *   • Firebase Performance — automatic performance monitoring
+ *
+ * Other:
+ *   • Claude Sonnet AI (Anthropic Messages API)
+ *   • Service Worker PWA (offline cache, background sync)
+ *   • Web Share API
  */
 
 /* ─── Region Data ──────────────────────────────────────────────────────────── */
@@ -14,6 +33,8 @@ const REGIONS = {
     search: "United States election process voter registration official",
     calendarText: "Election Day",
     mapsQuery: "polling place",
+    mapsCenter: { lat: 39.8283, lng: -98.5795 },
+    mapsZoom: 4,
     stats: [
       ["240M+", "registered voters in the US"],
       ["538", "Electoral College votes"],
@@ -34,6 +55,8 @@ const REGIONS = {
     search: "India election process ECI voter registration official",
     calendarText: "Election Reminder",
     mapsQuery: "election office",
+    mapsCenter: { lat: 20.5937, lng: 78.9629 },
+    mapsZoom: 5,
     stats: [
       ["970M+", "eligible voters in 2024"],
       ["543", "Lok Sabha elected seats"],
@@ -54,6 +77,8 @@ const REGIONS = {
     search: "UK election process register to vote official",
     calendarText: "Election Reminder",
     mapsQuery: "polling station",
+    mapsCenter: { lat: 55.3781, lng: -3.4360 },
+    mapsZoom: 5,
     stats: [
       ["650", "House of Commons constituencies"],
       ["18+", "general election voting age"],
@@ -74,6 +99,8 @@ const REGIONS = {
     search: "Canada election process Elections Canada official",
     calendarText: "Election Reminder",
     mapsQuery: "polling station",
+    mapsCenter: { lat: 56.1304, lng: -106.3468 },
+    mapsZoom: 4,
     stats: [
       ["338", "federal electoral districts"],
       ["18+", "minimum voting age"],
@@ -94,6 +121,8 @@ const REGIONS = {
     search: "Australia election process AEC official",
     calendarText: "Election Reminder",
     mapsQuery: "polling place",
+    mapsCenter: { lat: -25.2744, lng: 133.7751 },
+    mapsZoom: 4,
     stats: [
       ["18+", "minimum voting age"],
       ["151", "House of Representatives seats"],
@@ -114,6 +143,8 @@ const REGIONS = {
     search: "European Parliament election process official",
     calendarText: "European Election Reminder",
     mapsQuery: "polling station",
+    mapsCenter: { lat: 50.8503, lng: 4.3517 },
+    mapsZoom: 4,
     stats: [
       ["720", "MEPs in the 2024-2029 term"],
       ["27", "EU member states"],
@@ -134,6 +165,8 @@ const REGIONS = {
     search: "Nigeria election process INEC official",
     calendarText: "Election Reminder",
     mapsQuery: "polling unit",
+    mapsCenter: { lat: 9.0820, lng: 8.6753 },
+    mapsZoom: 5,
     stats: [
       ["18+", "minimum voting age"],
       ["36", "states and FCT"],
@@ -154,6 +187,8 @@ const REGIONS = {
     search: "Brazil election process TSE official",
     calendarText: "Election Reminder",
     mapsQuery: "seção eleitoral",
+    mapsCenter: { lat: -14.2350, lng: -51.9253 },
+    mapsZoom: 4,
     stats: [
       ["16+", "optional voting begins"],
       ["18-70", "mandatory voting age range"],
@@ -174,6 +209,8 @@ const REGIONS = {
     search: "how elections work voter registration official",
     calendarText: "Election Reminder",
     mapsQuery: "polling place",
+    mapsCenter: { lat: 20.0, lng: 0.0 },
+    mapsZoom: 2,
     stats: [
       ["1", "vote matters"],
       ["Local", "rules vary by place"],
@@ -263,9 +300,11 @@ let isLoading = false;
 let region = "US";
 let activeStep = 5;
 let googleMap = null;
-let placesAutocompleteService = null;
-let placesSessionToken = null;
+let placesAutocomplete = null;
 let mapsInitialized = false;
+
+// Session analytics counters (also logged to Firebase)
+const sessionStats = { questions: 0, topics: 0, maps: 0 };
 
 /* ─── DOM helpers ──────────────────────────────────────────────────────────── */
 const $ = (selector) => document.querySelector(selector);
@@ -281,28 +320,80 @@ function init() {
   updateRegion();
   updateOnlineStatus();
   addWelcome();
+  registerServiceWorker();
   logFirebase("page_view", { page: "civicguide_home", region });
+  window.firebaseSetUserProperty?.("preferred_region", region);
 }
 
-/* ─── Firebase Analytics helper ───────────────────────────────────────────── */
-function logFirebase(eventName, params = {}) {
-  try {
-    if (typeof window.firebaseLogEvent === "function") {
-      window.firebaseLogEvent(eventName, params);
-    }
-  } catch (_) {
-    // Analytics unavailable — continue silently
+/* ─── Service Worker (PWA) ─────────────────────────────────────────────────── */
+function registerServiceWorker() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js", { scope: "./" })
+      .then((reg) => {
+        console.info("CivicGuide SW registered:", reg.scope);
+        logFirebase("sw_registered", { scope: reg.scope });
+
+        // Listen for SW messages (e.g. SYNC_COMPLETE)
+        navigator.serviceWorker.addEventListener("message", (event) => {
+          if (event.data?.type === "SYNC_COMPLETE") {
+            showToast("Content synced for offline use.");
+          }
+        });
+      })
+      .catch((err) => {
+        console.warn("SW registration failed:", err.message);
+      });
   }
 }
 
-/* ─── Google Maps JS API integration ──────────────────────────────────────── */
+/* ─── Firebase Analytics ───────────────────────────────────────────────────── */
+function logFirebase(eventName, params = {}) {
+  try {
+    if (typeof window.firebaseLogEvent === "function") {
+      window.firebaseLogEvent(eventName, { ...params, timestamp: Date.now() });
+    }
+  } catch (_) {}
+}
+
+/** Store a question log to Firestore */
+async function storeQuestionLog(question, mode) {
+  try {
+    if (typeof window.firebaseAddDoc === "function" && window.firebaseDb) {
+      await window.firebaseAddDoc(
+        window.firebaseCollection(window.firebaseDb, "question_logs"),
+        {
+          question: question.slice(0, 200),
+          region,
+          mode,
+          timestamp: window.firebaseServerTimestamp?.() ?? new Date()
+        }
+      );
+    }
+  } catch (_) {
+    // Firestore may fail with demo config — continue silently
+  }
+}
+
+/** Update the sidebar session-stats display */
+function updateSessionStats() {
+  const q = $("#stat-questions");
+  const t = $("#stat-topics");
+  const m = $("#stat-maps");
+  if (q) q.textContent = String(sessionStats.questions);
+  if (t) t.textContent = String(sessionStats.topics);
+  if (m) m.textContent = String(sessionStats.maps);
+}
+
+/* ─── Google Maps JS API ───────────────────────────────────────────────────── */
 function initGoogleMaps() {
   mapsInitialized = true;
   initPlacesAutocomplete();
+  logFirebase("google_maps_loaded");
 }
 
 function handleMapsLoadError() {
   console.warn("CivicGuide: Google Maps failed to load. Map features unavailable.");
+  logFirebase("google_maps_load_error");
 }
 
 function initPlacesAutocomplete() {
@@ -310,10 +401,9 @@ function initPlacesAutocomplete() {
   if (!input || !window.google?.maps?.places) return;
 
   try {
-    placesSessionToken = new window.google.maps.places.AutocompleteSessionToken();
     const autocomplete = new window.google.maps.places.Autocomplete(input, {
       types: ["address"],
-      fields: ["formatted_address", "geometry", "name"]
+      fields: ["formatted_address", "geometry", "name", "place_id"]
     });
 
     autocomplete.addListener("place_changed", () => {
@@ -325,10 +415,18 @@ function initPlacesAutocomplete() {
       const address = place.formatted_address || place.name || "Selected location";
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-      $("#places-result").innerHTML = `<strong>${escapeHtml(address)}</strong><br>Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}. <a href="https://www.google.com/maps/search/${encodeURIComponent("polling place near " + address)}" target="_blank" rel="noopener noreferrer">Find polling places nearby →</a>`;
-      logFirebase("places_address_selected", { region });
+      const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(`${REGIONS[region]?.mapsQuery || "polling place"} near ${address}`)}`;
 
-      // If map panel is open, center it
+      $("#places-result").innerHTML = `
+        <strong>${escapeHtml(address)}</strong><br>
+        <small>Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small><br>
+        <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">Find ${escapeHtml(REGIONS[region]?.mapsQuery || "polling place")} nearby on Google Maps →</a>`;
+
+      // Update civic API input with selected address
+      const civicInput = $("#civic-address-input");
+      if (civicInput && !civicInput.value) civicInput.value = address;
+
+      // If map is open, re-center and drop marker
       if (googleMap) {
         googleMap.setCenter({ lat, lng });
         googleMap.setZoom(13);
@@ -338,12 +436,15 @@ function initPlacesAutocomplete() {
           title: address,
           animation: window.google.maps.Animation.DROP
         });
+        searchPollingPlacesNearby({ lat, lng });
       }
 
-      // Prefill civic API input
-      const civicInput = $("#civic-address-input");
-      if (civicInput && !civicInput.value) civicInput.value = address;
+      sessionStats.maps++;
+      updateSessionStats();
+      logFirebase("places_address_selected", { region, place_id: place.place_id || "" });
     });
+
+    placesAutocomplete = autocomplete;
   } catch (err) {
     console.warn("Places Autocomplete init failed:", err.message);
   }
@@ -351,44 +452,50 @@ function initPlacesAutocomplete() {
 
 function initOrShowMap() {
   if (!mapsInitialized || !window.google?.maps) {
-    // Fallback: embed iframe map
+    // Fallback iframe embed
     const canvas = $("#gmap-canvas");
     if (canvas) {
+      const query = encodeURIComponent(REGIONS[region]?.mapsQuery || "polling place");
       canvas.innerHTML = `<iframe
         title="Find polling places and election offices near you on Google Maps"
-        src="https://www.google.com/maps/embed?pb=!1m16!1m12!1m3!1d387190.2799160891!2d-74.35879435!3d40.6976691!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!2m1!1s${encodeURIComponent(REGIONS[region]?.mapsQuery || "polling place")}!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
+        src="https://www.google.com/maps/embed/v1/search?q=${query}&key=AIzaSyDemo-CivicGuide-ReplaceWithRealKey"
         width="100%" height="190" style="border:0;border-radius:8px;" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
     }
     return;
   }
 
-  if (googleMap) return; // Already initialized
+  if (googleMap) return;
 
   const canvas = $("#gmap-canvas");
   if (!canvas) return;
 
   try {
-    const mapOptions = {
-      zoom: 12,
-      center: { lat: 40.7128, lng: -74.006 },
+    const center = REGIONS[region]?.mapsCenter || { lat: 40.7128, lng: -74.006 };
+    const initialZoom = REGIONS[region]?.mapsZoom || 12;
+
+    googleMap = new window.google.maps.Map(canvas, {
+      zoom: initialZoom,
+      center,
       mapTypeId: window.google.maps.MapTypeId.ROADMAP,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,
       zoomControl: true,
+      gestureHandling: "cooperative",
       styles: [
         { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
       ]
-    };
+    });
 
-    googleMap = new window.google.maps.Map(canvas, mapOptions);
-
-    // Try geolocation to center map
+    // Geolocation to user's actual position
     if (navigator.geolocation) {
+      const statusEl = $("#map-status");
+      if (statusEl) statusEl.textContent = "Detecting your location…";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           googleMap.setCenter(userLocation);
+          googleMap.setZoom(13);
           new window.google.maps.Marker({
             position: userLocation,
             map: googleMap,
@@ -402,16 +509,21 @@ function initOrShowMap() {
               strokeWeight: 2
             }
           });
-
-          // Search for polling places near user
+          if (statusEl) statusEl.textContent = "";
           searchPollingPlacesNearby(userLocation);
+          logFirebase("geolocation_success", { region });
         },
         () => {
-          // Geolocation denied — keep default center
-          searchPollingPlacesNearby({ lat: 40.7128, lng: -74.006 });
-        }
+          if (statusEl) statusEl.textContent = "Location access denied — showing region center.";
+          searchPollingPlacesNearby(center);
+          logFirebase("geolocation_denied", { region });
+        },
+        { timeout: 8000, maximumAge: 60000 }
       );
     }
+
+    sessionStats.maps++;
+    updateSessionStats();
     logFirebase("map_opened", { region });
   } catch (err) {
     console.warn("Google Maps init failed:", err.message);
@@ -434,13 +546,22 @@ function searchPollingPlacesNearby(location) {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
           results.slice(0, 5).forEach((place) => {
             if (!place.geometry?.location) return;
-            new window.google.maps.Marker({
+            const marker = new window.google.maps.Marker({
               position: place.geometry.location,
               map: googleMap,
               title: place.name,
               animation: window.google.maps.Animation.DROP
             });
+            // Info window on click
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `<div style="font-family:sans-serif;font-size:13px;max-width:180px"><strong>${escapeHtml(place.name)}</strong><br><span style="color:#555">${escapeHtml(place.vicinity || "")}</span></div>`
+            });
+            marker.addListener("click", () => {
+              infoWindow.open(googleMap, marker);
+              logFirebase("map_marker_clicked", { place_name: place.name });
+            });
           });
+          logFirebase("places_nearby_found", { region, count: results.length });
         }
       }
     );
@@ -457,6 +578,9 @@ function cacheKey() {
     const mode = sessionStorage.getItem("cg_mode") || "";
     if (googleApiKey) $("#google-api-key-input").value = googleApiKey;
     $("#api-modal").style.display = apiKey || mode === "offline" ? "none" : "flex";
+
+    const statMode = $("#stat-mode");
+    if (statMode) statMode.textContent = apiKey ? "AI" : mode === "offline" ? "Offline" : "—";
   } catch (_) {
     apiKey = "";
     googleApiKey = "";
@@ -480,9 +604,12 @@ function saveKey() {
   } catch (_) {}
   error.textContent = "";
   $("#api-modal").style.display = "none";
+  const statMode = $("#stat-mode");
+  if (statMode) statMode.textContent = "AI";
   showToast("Key saved for this browser session.");
   $("#chat-input").focus();
   logFirebase("api_key_saved");
+  window.firebaseSetUserProperty?.("mode", "api");
 }
 
 function startOfflineMode() {
@@ -493,9 +620,12 @@ function startOfflineMode() {
   } catch (_) {}
   $("#api-key-error").textContent = "";
   $("#api-modal").style.display = "none";
+  const statMode = $("#stat-mode");
+  if (statMode) statMode.textContent = "Offline";
   showToast("Offline education mode enabled.");
   $("#chat-input").focus();
   logFirebase("offline_mode_started");
+  window.firebaseSetUserProperty?.("mode", "offline");
 }
 
 function changeKey() {
@@ -524,18 +654,47 @@ function bindEvents() {
     toggleMobileMenu(false);
     showToast(`Region set to ${REGIONS[region].name}.`);
     logFirebase("region_changed", { region });
+    window.firebaseSetUserProperty?.("preferred_region", region);
   });
   $("#chat-input").addEventListener("input", onInputChange);
   $("#chat-input").addEventListener("keydown", handleKey);
   $("#send-btn").addEventListener("click", () => sendMessage());
   $("#copy-btn").addEventListener("click", copyConversation);
   $("#clear-btn").addEventListener("click", clearChat);
-  $("#print-btn").addEventListener("click", () => { window.print(); logFirebase("print_triggered"); });
+  $("#print-btn").addEventListener("click", () => {
+    window.print();
+    logFirebase("print_triggered");
+  });
+  $("#share-btn")?.addEventListener("click", shareApp);
   $("#maps-toggle-btn").addEventListener("click", toggleMap);
   $("#civic-api-form").addEventListener("submit", lookupCivicInfo);
   window.addEventListener("online", updateOnlineStatus);
   window.addEventListener("offline", updateOnlineStatus);
   window.addEventListener("keydown", (e) => { if (e.key === "Escape") toggleMobileMenu(false); });
+}
+
+/* ─── Share (Web Share API) ────────────────────────────────────────────────── */
+async function shareApp() {
+  const shareData = {
+    title: "CivicGuide — Election Process Assistant",
+    text: "Learn about elections, voter registration, and civic rights with AI guidance.",
+    url: window.location.href
+  };
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData);
+      logFirebase("app_shared", { method: "web_share_api" });
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast("Link copied to clipboard.");
+      logFirebase("app_shared", { method: "clipboard" });
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      await navigator.clipboard.writeText(window.location.href).catch(() => {});
+      showToast("Link copied to clipboard.");
+    }
+  }
 }
 
 /* ─── UI Builders ───────────────────────────────────────────────────────────── */
@@ -563,6 +722,7 @@ function buildTimeline() {
       buildTimeline();
       updateProgress();
       askAbout(`Explain step ${index + 1} of the election process: ${title}. Include what voters should know.`);
+      logFirebase("timeline_step_clicked", { step: index + 1, title });
     });
     el.appendChild(item);
   });
@@ -583,7 +743,12 @@ function buildTopics() {
     btn.type = "button";
     btn.setAttribute("role", "listitem");
     btn.innerHTML = `<span class="topic-icon" aria-hidden="true">${topicIcon(icon)}</span><span>${escapeHtml(label)}</span>`;
-    btn.addEventListener("click", () => { askAbout(question); logFirebase("topic_clicked", { topic: label }); });
+    btn.addEventListener("click", () => {
+      askAbout(question);
+      sessionStats.topics++;
+      updateSessionStats();
+      logFirebase("topic_clicked", { topic: label });
+    });
     el.appendChild(btn);
   });
 }
@@ -602,7 +767,10 @@ function buildChips() {
     btn.type = "button";
     btn.setAttribute("role", "listitem");
     btn.textContent = chip;
-    btn.addEventListener("click", () => { askAbout(chip); logFirebase("chip_clicked", { chip }); });
+    btn.addEventListener("click", () => {
+      askAbout(chip);
+      logFirebase("chip_clicked", { chip });
+    });
     el.appendChild(btn);
   });
 }
@@ -615,6 +783,14 @@ function updateRegion() {
   buildSources(data);
   buildYouTube(data);
   updateGoogleLinks(data);
+
+  // If map is open, reset it for new region
+  if (googleMap) {
+    const center = data.mapsCenter || { lat: 40.7128, lng: -74.006 };
+    googleMap.setCenter(center);
+    googleMap.setZoom(data.mapsZoom || 12);
+    logFirebase("map_region_updated", { region });
+  }
 }
 
 function updateProgress() {
@@ -634,7 +810,10 @@ function buildStats(data) {
     card.type = "button";
     card.setAttribute("role", "listitem");
     card.innerHTML = `<div class="stat-num">${escapeHtml(num)}</div><div class="stat-label">${escapeHtml(label)}</div>`;
-    card.addEventListener("click", () => askAbout(`Explain this election fact for ${data.name}: ${num} - ${label}.`));
+    card.addEventListener("click", () => {
+      askAbout(`Explain this election fact for ${data.name}: ${num} - ${label}.`);
+      logFirebase("stat_card_clicked", { region, stat: num });
+    });
     el.appendChild(card);
   });
 }
@@ -655,6 +834,7 @@ function buildSources(data) {
         <span class="src-name">${escapeHtml(name)}</span>
         <span class="src-desc">${escapeHtml(desc)}</span>
       </span>`;
+    link.addEventListener("click", () => logFirebase("official_source_clicked", { region, source: name }));
     el.appendChild(link);
   });
 }
@@ -674,6 +854,7 @@ function buildYouTube(data) {
     link.rel = "noopener noreferrer";
     link.setAttribute("role", "listitem");
     link.textContent = query;
+    link.addEventListener("click", () => logFirebase("youtube_link_clicked", { region, query }));
     el.appendChild(link);
   });
 }
@@ -681,15 +862,19 @@ function buildYouTube(data) {
 function updateGoogleLinks(data) {
   const query = encodeURIComponent(data.search);
   const mapsQuery = encodeURIComponent(`${data.mapsQuery || "election office"} near me ${data.name}`);
+  const pollingQuery = encodeURIComponent(`polling place near me ${data.name}`);
   const calendarText = encodeURIComponent(data.calendarText);
   const details = encodeURIComponent(`Check official election dates and rules for ${data.name}. Start with: ${data.official}.`);
   const dates = "20261103T090000/20261103T100000";
   const [registerLabel, registerUrl] = REGISTRATION_LINKS[region] || REGISTRATION_LINKS.GEN;
 
-  const searchLink = $$(".g-service-btn").find((l) => l.textContent?.includes("Search Election Info"));
-  const officeLink = $$(".g-service-btn").find((l) => l.textContent?.includes("Find Election Office"));
-  if (searchLink) searchLink.href = `https://www.google.com/search?q=${query}`;
-  if (officeLink) officeLink.href = `https://www.google.com/maps/search/${mapsQuery}`;
+  const searchBtn = $("#google-search-btn");
+  const mapsOfficeBtn = $("#google-maps-office-btn");
+  const pollingHeaderLink = $("#polling-header-link");
+
+  if (searchBtn) searchBtn.href = `https://www.google.com/search?q=${query}`;
+  if (mapsOfficeBtn) mapsOfficeBtn.href = `https://www.google.com/maps/search/${mapsQuery}`;
+  if (pollingHeaderLink) pollingHeaderLink.href = `https://www.google.com/maps/search/${pollingQuery}`;
   $("#register-service-link").href = registerUrl;
   $("#register-service-label").textContent = registerLabel;
   $("#gcal-btn").href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${calendarText}&details=${details}&dates=${dates}`;
@@ -700,6 +885,7 @@ function addWelcome() {
   addMsg("bot", `
     <p>Welcome. I am <strong>CivicGuide</strong>, a plain-language assistant for the <strong>Election Process Education</strong> challenge vertical.</p>
     <p>Choose a region, select a timeline step, or ask a question. I can explain registration, voting methods, vote counting, certification, security, and how to check official sources.</p>
+    <p>Use the <strong>Google Services</strong> panel to find polling places on Google Maps, add election dates to Google Calendar, look up official info via the Google Civic Information API, or search with Google Translate in your language.</p>
     <div class="highlight-box">For legal deadlines or eligibility, always verify with your official election authority. Rules can change by country, state, province, or district.</div>
   `, ["Give me the full election timeline", "What should I check before voting?", "How do officials verify results?"]);
 }
@@ -718,6 +904,7 @@ Goals:
 - Stay politically neutral. Do not endorse parties, candidates, or policy positions.
 - Avoid making legal certainty claims. Tell users to verify deadlines and eligibility with official sources.
 - Help users identify misinformation by checking primary election authorities.
+- Suggest using Google Maps to find polling places, Google Calendar to set election reminders, and the Google Civic Information API for official voter data.
 
 Response style:
 - Start with the direct answer.
@@ -738,7 +925,12 @@ async function sendMessage(override = "") {
   addMsg("user", escapeHtml(text));
   setLoading(true);
   showTyping();
-  logFirebase("question_asked", { region, mode: apiKey ? "api" : "offline" });
+
+  const mode = apiKey ? "api" : "offline";
+  sessionStats.questions++;
+  updateSessionStats();
+  logFirebase("question_asked", { region, mode });
+  storeQuestionLog(text, mode);
 
   try {
     const raw = apiKey ? await callClaude(text) : localAnswer(text);
@@ -746,14 +938,14 @@ async function sendMessage(override = "") {
     const rendered = mdToHtml(raw);
     addMsg("bot", rendered.html, rendered.followUps);
     setStatus("Ready");
-    logFirebase("answer_received", { region });
+    logFirebase("answer_received", { region, mode });
   } catch (err) {
     removeTyping();
     setStatus("Connection issue", "error");
     const fallback = localAnswer(text);
     const rendered = mdToHtml(`${fallback}\n\n[note: Claude could not be reached: ${err.message}. I used CivicGuide's built-in offline guidance instead.]`);
     addMsg("bot", rendered.html, rendered.followUps);
-    logFirebase("api_error", { error: err.message });
+    logFirebase("api_error", { error: err.message, region });
   } finally {
     setLoading(false);
     input.focus();
@@ -838,7 +1030,10 @@ function addMsg(role, html, followUps = []) {
     </div>`;
 
   wrap.querySelectorAll(".follow-chip").forEach((btn) => {
-    btn.addEventListener("click", () => askAbout(btn.textContent));
+    btn.addEventListener("click", () => {
+      askAbout(btn.textContent);
+      logFirebase("follow_up_chip_clicked");
+    });
   });
   area.appendChild(wrap);
   area.scrollTop = area.scrollHeight;
@@ -946,7 +1141,10 @@ function copyConversation() {
     .join("\n\n---\n\n");
   if (!text) { showToast("No conversation to copy yet."); return; }
   navigator.clipboard.writeText(text)
-    .then(() => { showToast("Conversation copied."); logFirebase("conversation_copied"); })
+    .then(() => {
+      showToast("Conversation copied.");
+      logFirebase("conversation_copied");
+    })
     .catch(() => showToast("Copy failed. Select the text manually."));
 }
 
@@ -967,7 +1165,7 @@ function toggleMap() {
   $("#maps-toggle-label").textContent = expanded ? "Show Polling Map" : "Hide Polling Map";
   if (!expanded) {
     initOrShowMap();
-    logFirebase("map_toggled", { action: "open" });
+    logFirebase("map_toggled", { action: "open", region });
   }
 }
 
@@ -992,11 +1190,12 @@ async function lookupCivicInfo(event) {
 
   if (!googleApiKey) {
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`official election information ${address}`)}`;
-    result.innerHTML = `No Google API key added. <a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Open Google Search for official election sources</a>.`;
+    result.innerHTML = `No Google API key added. <a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Open Google Search for official election sources →</a>`;
+    logFirebase("civic_api_no_key", { region });
     return;
   }
 
-  result.textContent = "Checking Google Civic Information API...";
+  result.textContent = "Checking Google Civic Information API…";
   try {
     const data = await fetchGoogleCivicInfo(address, googleApiKey);
     const election = data.election?.name || "Election information";
@@ -1006,11 +1205,24 @@ async function lookupCivicInfo(event) {
       : address;
     const contests = Array.isArray(data.contests) ? data.contests.length : 0;
     const pollingLocations = Array.isArray(data.pollingLocations) ? data.pollingLocations.length : 0;
-    result.innerHTML = `<strong>${escapeHtml(election)}</strong><br>${escapeHtml(place)}<br>${contests} contest(s) and ${pollingLocations} polling place result(s) returned by Google Civic Information API.`;
-    logFirebase("civic_api_lookup", { region, success: true });
+    const earlyVoting = Array.isArray(data.earlyVoteSites) ? data.earlyVoteSites.length : 0;
+
+    let pollingHtml = "";
+    if (Array.isArray(data.pollingLocations) && data.pollingLocations.length > 0) {
+      const loc = data.pollingLocations[0];
+      const locName = loc.address?.locationName || "";
+      const locLine = [loc.address?.line1, loc.address?.city, loc.address?.state].filter(Boolean).join(", ");
+      if (locName || locLine) {
+        const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(`${locName} ${locLine}`)}`;
+        pollingHtml = `<br><a href="${mapsLink}" target="_blank" rel="noopener noreferrer">📍 ${escapeHtml(locName || locLine)} — View on Google Maps →</a>`;
+      }
+    }
+
+    result.innerHTML = `<strong>${escapeHtml(election)}</strong><br>${escapeHtml(place)}<br>${contests} contest(s) · ${pollingLocations} polling place(s) · ${earlyVoting} early voting site(s)${pollingHtml}`;
+    logFirebase("civic_api_lookup", { region, success: true, contests, pollingLocations });
   } catch (err) {
     result.textContent = `Google Civic lookup unavailable: ${err.message}. Verify details with your official election authority.`;
-    logFirebase("civic_api_error", { error: err.message });
+    logFirebase("civic_api_error", { error: err.message, region });
   }
 }
 
@@ -1046,8 +1258,19 @@ function toggleMobileMenu(force) {
 function updateOnlineStatus() {
   const offline = !navigator.onLine;
   $("#offline-banner").hidden = !offline;
-  if (offline) setStatus("Offline", "error");
-  if (!offline && !isLoading) setStatus("Ready");
+  if (offline) {
+    setStatus("Offline", "error");
+    logFirebase("went_offline");
+  }
+  if (!offline && !isLoading) {
+    setStatus("Ready");
+    // Trigger background sync when back online
+    if ("serviceWorker" in navigator && "SyncManager" in window) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.sync.register("civicguide-sync").catch(() => {});
+      });
+    }
+  }
 }
 
 function showToast(message) {
@@ -1070,9 +1293,15 @@ function escapeHtml(value) {
 function googleTranslateInit() {
   if (!window.google?.translate?.TranslateElement) return;
   new window.google.translate.TranslateElement(
-    { pageLanguage: "en", includedLanguages: "en,hi,es,fr,pt,ar,bn,ta,te", layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE },
+    {
+      pageLanguage: "en",
+      includedLanguages: "en,hi,es,fr,pt,ar,bn,ta,te,zh-CN,ru,de,ja",
+      layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+      autoDisplay: false
+    },
     "google_translate_element"
   );
+  logFirebase("google_translate_init");
 }
 
 /* ─── Exports ───────────────────────────────────────────────────────────────── */

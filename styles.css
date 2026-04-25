@@ -685,3 +685,27 @@ header {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Analytics card ─────────────────────────────────────────── */
+.analytics-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.72rem;
+}
+.analytics-row:last-child { border-bottom: none; }
+.analytics-label { color: rgba(255,255,255,0.5); }
+.analytics-val {
+  font-weight: 700; color: var(--gold-bright);
+  font-family: 'Cormorant Garamond', serif; font-size: 0.85rem;
+}
+
+/* ── Map status message ─────────────────────────────────────── */
+.map-status-msg {
+  font-size: 0.7rem; color: rgba(255,255,255,0.45);
+  padding: 4px 0; min-height: 1em;
+}
+
+/* ── Civic API title with icon ──────────────────────────────── */
+.civic-api-title {
+  display: flex; align-items: center; gap: 5px;
+}
