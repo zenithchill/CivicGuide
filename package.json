@@ -1,9 +1,23 @@
 {
   "name": "civicguide-election-assistant",
-  "version": "1.0.0",
-  "description": "Offline-first election process education assistant with Google Services integrations.",
+  "version": "2.0.0",
+  "description": "Offline-first election process education assistant with Google Maps JS API, Google Places Autocomplete, Firebase Analytics, Google Civic API, and Claude AI integrations.",
   "private": true,
   "scripts": {
-    "test": "node scripts/test.js"
+    "test": "node \"Civicguidetest .js\""
+  },
+  "keywords": [
+    "elections",
+    "civic-education",
+    "google-maps",
+    "firebase",
+    "claude-ai",
+    "places-api"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "jsdom": "^29.0.2"
   }
 }

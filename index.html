@@ -7,24 +7,48 @@
   <meta name="theme-color" content="#0D1B2A" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <title>CivicGuide — Election Process Assistant</title>
-  <!-- Open Graph / Social -->
   <meta property="og:title" content="CivicGuide — Election Process Assistant" />
   <meta property="og:description" content="Understand elections, voter registration, and civic rights with AI guidance." />
   <meta property="og:type" content="website" />
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <!-- Google Translate -->
   <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateInit" defer></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?libraries=places&callback=initGoogleMaps" onerror="handleMapsLoadError()"></script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
+    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    const firebaseConfig = {
+      apiKey: "AIzaSyDemo-CivicGuide-Replace-With-Real",
+      authDomain: "civicguide-demo.firebaseapp.com",
+      projectId: "civicguide-demo",
+      storageBucket: "civicguide-demo.appspot.com",
+      messagingSenderId: "000000000000",
+      appId: "1:000000000000:web:0000000000000000000000",
+      measurementId: "G-XXXXXXXXXX"
+    };
+    try {
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      const db = getFirestore(app);
+      window.firebaseAnalytics = analytics;
+      window.firebaseLogEvent = (name, params) => { try { logEvent(analytics, name, params); } catch (_) {} };
+      window.firebaseDb = db;
+      window.firebaseCollection = collection;
+      window.firebaseAddDoc = addDoc;
+      window.firebaseServerTimestamp = serverTimestamp;
+      logEvent(analytics, 'app_open', { app: 'civicguide' });
+    } catch (e) {
+      window.firebaseLogEvent = () => {};
+    }
+  </script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Skip Navigation -->
   <a class="skip-link" href="#chat-input">Skip to chat input</a>
   <div class="mobile-scrim" id="mobile-scrim" hidden></div>
 
-  <!-- API Key Modal -->
   <div class="modal-overlay" id="api-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-desc">
     <div class="modal">
       <div class="modal-icon-wrap" aria-hidden="true">
@@ -41,15 +65,9 @@
     </div>
   </div>
 
-  <!-- Toast Notifications -->
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div class="offline-banner" id="offline-banner" role="alert" hidden>⚠️ You appear to be offline. Some features may be unavailable.</div>
 
-  <!-- Offline Banner -->
-  <div class="offline-banner" id="offline-banner" role="alert" hidden>
-    ⚠️ You appear to be offline. Some features may be unavailable.
-  </div>
-
-  <!-- Header -->
   <header role="banner">
     <a class="logo" href="#" aria-label="CivicGuide Home">
       <div class="logo-mark" aria-hidden="true">
@@ -58,9 +76,7 @@
       <span class="logo-name">Civic<em>Guide</em></span>
     </a>
     <button class="mobile-menu-btn" id="mobile-menu-btn" type="button" aria-label="Open navigation" aria-controls="app-shell" aria-expanded="false">
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
     </button>
     <nav class="header-right" aria-label="Header utilities">
       <div id="google_translate_element" aria-label="Google Translate"></div>
@@ -76,12 +92,8 @@
     </nav>
   </header>
 
-  <!-- App Shell -->
   <div class="app-shell" id="app-shell">
-
-    <!-- Left Sidebar -->
     <aside class="sidebar-left" aria-label="Navigation, region picker, and election timeline">
-
       <div class="sidebar-section">
         <div class="sidebar-label" id="region-label">Your Region</div>
         <select class="region-select" id="region-select" aria-labelledby="region-label">
@@ -96,57 +108,45 @@
           <option value="GEN">🌍 General / Other</option>
         </select>
       </div>
-
       <div class="sidebar-section">
         <div class="sidebar-label" id="timeline-label">Election Timeline</div>
         <div class="timeline" id="timeline" role="list" aria-labelledby="timeline-label"></div>
       </div>
-
       <div class="sidebar-section">
         <div class="sidebar-label" id="topics-label">Explore Topics</div>
         <div id="topic-buttons" role="list" aria-labelledby="topics-label"></div>
       </div>
-
       <div class="sidebar-section">
         <div class="sidebar-label">Google Services</div>
-
         <a class="g-service-btn" id="register-service-link" href="https://www.vote.gov" target="_blank" rel="noopener noreferrer" aria-label="Official voter registration service (opens new tab)">
           <div class="g-icon" style="background:#e8f0fe" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="#4285F4"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div>
           <span id="register-service-label">Vote.gov — Register to Vote</span>
         </a>
-
         <a class="g-service-btn" href="https://www.google.com/search?q=how+do+elections+work" target="_blank" rel="noopener noreferrer" aria-label="Google Search: how elections work (opens new tab)">
           <div class="g-icon" style="background:#fce8e6" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="#EA4335"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></div>
           Search Election Info
         </a>
-
         <a class="g-service-btn" href="https://www.google.com/maps/search/election+office+near+me" target="_blank" rel="noopener noreferrer" aria-label="Find election office on Google Maps (opens new tab)">
           <div class="g-icon" style="background:#e6f4ea" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="#34A853"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
           Find Election Office
         </a>
-
         <a class="g-service-btn" id="gcal-btn" href="https://calendar.google.com/calendar/r/eventedit?text=Election+Day&details=Vote+today!+Find+your+polling+place+at+vote.gov&location=Your+polling+place" target="_blank" rel="noopener noreferrer" aria-label="Add Election Day to Google Calendar (opens new tab)">
           <div class="g-icon" style="background:#fef7e0" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="#FBBC05"><path d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg></div>
           Add Key Dates to Calendar
         </a>
-
         <button class="g-service-btn" id="maps-toggle-btn" aria-expanded="false" aria-controls="maps-panel">
           <div class="g-icon" style="background:#e8f0fe" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="#4285F4"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg></div>
           <span id="maps-toggle-label">Show Polling Map</span>
         </button>
         <div id="maps-panel" class="maps-embed-panel" hidden>
-          <iframe
-            title="Find polling places and election offices near you on Google Maps"
-            src="https://www.google.com/maps/embed?pb=!1m16!1m12!1m3!1d387190.2799160891!2d-74.35879435!3d40.6976691!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!2m1!1spolling+place!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
-            width="100%"
-            height="190"
-            style="border:0;border-radius:8px;margin-top:8px;"
-            allowfullscreen=""
-            loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade">
-          </iframe>
+          <div id="gmap-canvas" style="width:100%;height:190px;border-radius:8px;margin-top:8px;" aria-label="Interactive Google Map showing polling places near you" role="img"></div>
         </div>
-
+        <div class="civic-api-card" id="places-card" aria-labelledby="places-card-title">
+          <div class="civic-api-title" id="places-card-title">📍 Address Lookup</div>
+          <label for="places-input">Search your address</label>
+          <input id="places-input" type="text" autocomplete="off" maxlength="200" placeholder="Start typing your address…" aria-label="Address autocomplete powered by Google Places" />
+          <div id="places-result" class="civic-api-result" role="status" aria-live="polite">Powered by Google Places API — select an address to find nearby polling places.</div>
+        </div>
         <form class="civic-api-card" id="civic-api-form" aria-labelledby="civic-api-title">
           <div class="civic-api-title" id="civic-api-title">Google Civic API Lookup</div>
           <label for="civic-address-input">Street address</label>
@@ -157,14 +157,12 @@
           <div class="civic-api-result" id="civic-api-result" role="status" aria-live="polite">Enter an address to open a trusted Google Civic Information lookup.</div>
         </form>
       </div>
-
       <div class="powered-row">
         <svg viewBox="0 0 24 24" width="11" height="11" fill="rgba(255,255,255,0.25)" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
-        Powered by <a href="https://anthropic.com" target="_blank" rel="noopener noreferrer">Claude AI</a>, <a href="https://developers.google.com/civic-information" target="_blank" rel="noopener noreferrer">Google Civic Information API</a> &amp; <a href="https://fonts.google.com" target="_blank" rel="noopener noreferrer">Google Fonts</a>
+        Powered by <a href="https://anthropic.com" target="_blank" rel="noopener noreferrer">Claude AI</a>, <a href="https://developers.google.com/civic-information" target="_blank" rel="noopener noreferrer">Google Civic API</a>, <a href="https://firebase.google.com" target="_blank" rel="noopener noreferrer">Firebase</a> &amp; <a href="https://fonts.google.com" target="_blank" rel="noopener noreferrer">Google Fonts</a>
       </div>
     </aside>
 
-    <!-- Main Chat -->
     <main class="chat-panel" aria-label="Conversation with CivicGuide">
       <div class="chat-header">
         <div class="chat-header-text">
@@ -182,22 +180,11 @@
           </div>
         </div>
       </div>
-
       <div class="chips-bar" id="chips-bar" role="list" aria-label="Quick question shortcuts"></div>
-
       <div class="messages-area" id="messages-area" role="log" aria-live="polite" aria-label="Chat messages" aria-relevant="additions text"></div>
-
       <div class="input-wrap">
         <div class="input-box" id="input-box">
-          <textarea
-            id="chat-input"
-            rows="1"
-            placeholder="Ask about voter registration, polling, ballot counting…"
-            aria-label="Type your question about elections"
-            aria-describedby="input-hint char-counter"
-            maxlength="600"
-            spellcheck="true"
-          ></textarea>
+          <textarea id="chat-input" rows="1" placeholder="Ask about voter registration, polling, ballot counting…" aria-label="Type your question about elections" aria-describedby="input-hint char-counter" maxlength="600" spellcheck="true"></textarea>
           <button class="send-btn" id="send-btn" aria-label="Send message" disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21l21-9-21-9v7l15 2-15 2z"/></svg>
           </button>
@@ -209,9 +196,7 @@
       </div>
     </main>
 
-    <!-- Right Sidebar -->
     <aside class="sidebar-right" aria-label="Election facts and official sources">
-
       <div class="right-section">
         <div class="right-label" id="glance-label">Election at a Glance</div>
         <div class="progress-bar-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="6" aria-label="Election timeline step 6 of 10">
@@ -222,17 +207,14 @@
         </div>
         <div id="stat-cards" role="list" aria-label="Key election statistics"></div>
       </div>
-
       <div class="right-section">
         <div class="right-label" id="sources-label">Official Sources</div>
         <div id="source-links" role="list" aria-labelledby="sources-label"></div>
       </div>
-
       <div class="right-section">
         <div class="right-label">Learn on YouTube</div>
         <div id="yt-btns" role="list" aria-label="Election explainer videos on YouTube"></div>
       </div>
-
       <div class="right-section">
         <div class="right-label">Safety Checks</div>
         <ul class="safety-list" aria-label="Security and trust safeguards">
@@ -242,7 +224,6 @@
           <li>No cookies or backend storage</li>
         </ul>
       </div>
-
       <div class="right-section">
         <div class="right-label">Actions</div>
         <button class="g-service-btn" id="copy-btn" aria-label="Copy conversation to clipboard">
@@ -258,7 +239,6 @@
           Print / Save PDF
         </button>
       </div>
-
     </aside>
   </div>
 
