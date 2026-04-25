@@ -3,6 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content Security Policy — restricts script/style/connect origins -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src  'self' 'unsafe-inline' https://translate.google.com https://maps.googleapis.com https://www.gstatic.com https://www.google.com https://generativelanguage.googleapis.com;
+    style-src   'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src    https://fonts.gstatic.com;
+    connect-src 'self'
+                https://api.anthropic.com
+                https://generativelanguage.googleapis.com
+                https://language.googleapis.com
+                https://bigquery.googleapis.com
+                https://www.googleapis.com
+                https://maps.googleapis.com
+                https://firestore.googleapis.com
+                https://firebase.googleapis.com
+                https://www.gstatic.com
+                https://us-central1-civicguide-app.cloudfunctions.net;
+    img-src     'self' data: https: blob:;
+    frame-src   https://www.google.com https://translate.google.com;
+    worker-src  'self';
+    manifest-src 'self';
+  " />
+  <!-- Permissions Policy — restrict sensitive browser APIs -->
+  <meta http-equiv="Permissions-Policy" content="geolocation=(self), microphone=(), camera=(), payment=(), usb=(), serial=()" />
   <meta name="description" content="CivicGuide – AI-powered election education assistant. Understand voter registration, ballot counting, the Electoral College, and more." />
   <meta name="theme-color" content="#0D1B2A" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
@@ -23,37 +47,64 @@
   <!-- Google Translate -->
   <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateInit" defer></script>
 
-  <!-- Google Maps JS API with Places, Geometry libraries -->
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDemo-CivicGuide-ReplaceWithRealKey&libraries=places,geometry&callback=initGoogleMaps&loading=async"
-    onerror="handleMapsLoadError()"></script>
+  <!-- Google Maps JS API — loaded dynamically with runtime-configurable key -->
+  <script>
+    (function loadGoogleMaps() {
+      var key = (function() { try { return sessionStorage.getItem('cg_google_key') || ''; } catch (_) { return ''; } })();
+      var script = document.createElement('script');
+      var keyParam = key ? ('key=' + encodeURIComponent(key) + '&') : '';
+      script.src = 'https://maps.googleapis.com/maps/api/js?' + keyParam + 'libraries=places,geometry&callback=initGoogleMaps&loading=async';
+      script.async = true;
+      script.defer = true;
+      script.onerror = function() { if (typeof handleMapsLoadError === 'function') handleMapsLoadError(); };
+      document.head.appendChild(script);
+    })();
+  </script>
 
-  <!-- Firebase v10 modular SDK -->
+  <!-- Firebase v10 modular SDK — initialized with runtime config -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-    import { getAnalytics, logEvent, setUserProperties } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
-    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getAnalytics, logEvent, setUserProperties, isSupported as analyticsSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, enableIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
     import { getPerformance } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-performance.js';
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDemo-CivicGuide-Replace-With-Real",
-      authDomain: "civicguide-demo.firebaseapp.com",
-      projectId: "civicguide-demo",
-      storageBucket: "civicguide-demo.appspot.com",
-      messagingSenderId: "000000000000",
-      appId: "1:000000000000:web:0000000000000000000000",
-      measurementId: "G-XXXXXXXXXX"
-    };
+    /**
+     * Load Firebase config from sessionStorage (set via Google Services setup panel)
+     * or fall back to environment defaults. This allows runtime configuration
+     * without hardcoding credentials.
+     */
+    function loadFirebaseConfig() {
+      try {
+        const stored = sessionStorage.getItem('cg_firebase_config');
+        if (stored) return JSON.parse(stored);
+      } catch (_) {}
+      // Default config — replace with your Firebase project credentials
+      return {
+        apiKey: sessionStorage.getItem('cg_firebase_key') || "AIzaSyDemo-CivicGuide-Replace-With-Real",
+        authDomain: "civicguide-app.firebaseapp.com",
+        projectId: "civicguide-app",
+        storageBucket: "civicguide-app.appspot.com",
+        messagingSenderId: "123456789012",
+        appId: "1:123456789012:web:abcdef1234567890abcdef",
+        measurementId: "G-CIVICGUIDE01"
+      };
+    }
+
+    const firebaseConfig = loadFirebaseConfig();
+    const isRealConfig = !firebaseConfig.apiKey.includes('Demo') && !firebaseConfig.apiKey.includes('Replace');
+
+    // Expose config status for UI
+    window.firebaseConfigured = isRealConfig;
 
     try {
       const app = initializeApp(firebaseConfig);
-      const analytics = getAnalytics(app);
       const db = getFirestore(app);
-      const perf = getPerformance(app);
 
-      window.firebaseAnalytics = analytics;
-      window.firebaseLogEvent = (name, params) => { try { logEvent(analytics, name, params); } catch (_) {} };
-      window.firebaseSetUserProperty = (key, val) => { try { setUserProperties(analytics, { [key]: val }); } catch (_) {} };
+      // Enable offline persistence for Firestore
+      enableIndexedDbPersistence(db).catch(() => {
+        // Persistence may fail in some browsers — continue without it
+      });
+
       window.firebaseDb = db;
       window.firebaseCollection = collection;
       window.firebaseAddDoc = addDoc;
@@ -62,17 +113,38 @@
       window.firebaseOrderBy = orderBy;
       window.firebaseLimit = limit;
       window.firebaseGetDocs = getDocs;
+
+      // Analytics — only initialize if supported and config looks real
+      const analyticsOk = await analyticsSupported().catch(() => false);
+      if (analyticsOk) {
+        const analytics = getAnalytics(app);
+        window.firebaseAnalytics = analytics;
+        window.firebaseLogEvent = (name, params) => {
+          try { logEvent(analytics, name, { ...params, app_version: '2.0.0' }); } catch (_) {}
+        };
+        window.firebaseSetUserProperty = (key, val) => {
+          try { setUserProperties(analytics, { [key]: val }); } catch (_) {}
+        };
+        logEvent(analytics, 'app_open', { app: 'civicguide', version: '2.0.0', firebase_configured: isRealConfig });
+        setUserProperties(analytics, { app_version: '2.0.0', platform: 'web' });
+      } else {
+        window.firebaseLogEvent = () => {};
+        window.firebaseSetUserProperty = () => {};
+      }
+
+      // Performance monitoring
+      const perf = getPerformance(app);
       window.firebasePerf = perf;
 
-      logEvent(analytics, 'app_open', { app: 'civicguide', version: '2.0.0' });
-      setUserProperties(analytics, { app_version: '2.0.0' });
-      window.dispatchEvent(new CustomEvent('firebase-ready'));
+      console.info('CivicGuide: Firebase initialized', { configured: isRealConfig, persistence: 'IndexedDB' });
+      window.dispatchEvent(new CustomEvent('firebase-ready', { detail: { configured: isRealConfig } }));
     } catch (e) {
-      console.warn('Firebase init failed (demo config — replace with real keys):', e.message);
+      console.warn('Firebase init failed:', e.message);
       window.firebaseLogEvent = () => {};
       window.firebaseSetUserProperty = () => {};
       window.firebaseAddDoc = () => Promise.resolve();
-      window.dispatchEvent(new CustomEvent('firebase-ready'));
+      window.firebaseConfigured = false;
+      window.dispatchEvent(new CustomEvent('firebase-ready', { detail: { configured: false } }));
     }
   </script>
 
@@ -88,10 +160,12 @@
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#C8902A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </div>
       <h2 id="modal-title">Choose Assistant Mode</h2>
-      <p id="modal-desc">Use CivicGuide instantly in offline education mode, or add an Anthropic API key for dynamic AI answers. Keys are kept only in this browser session.</p>
-      <label for="api-key-input">Anthropic API Key</label>
+      <p id="modal-desc">Use CivicGuide instantly in offline education mode, add an Anthropic API key for Claude AI, or add a Google API key to enable Gemini AI + Maps + BigQuery analytics. Keys are kept only in this browser session.</p>
+      <label for="api-key-input">Anthropic API Key <span style="font-size:0.8em;opacity:0.7">(for Claude AI)</span></label>
       <input type="password" id="api-key-input" placeholder="sk-ant-api03-…" aria-required="true" autocomplete="off" spellcheck="false" />
       <div id="api-key-error" role="alert" aria-live="assertive" class="field-error"></div>
+      <label for="google-modal-key-input" style="margin-top:10px;display:block">Google API Key <span style="font-size:0.8em;opacity:0.7">(for Gemini AI, Maps, BigQuery, NLP)</span></label>
+      <input type="password" id="google-modal-key-input" placeholder="AIza…" autocomplete="off" spellcheck="false" style="margin-bottom:4px" />
       <button class="btn-primary" id="save-key-btn">Launch CivicGuide →</button>
       <button class="btn-secondary" id="demo-mode-btn">Continue Without API Key</button>
       <p class="modal-foot">Stored in session only. <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">Get a free key →</a></p>
@@ -191,12 +265,54 @@
           <div class="civic-api-result" id="civic-api-result" role="status" aria-live="polite">Enter an address to open a trusted Google Civic Information lookup.</div>
         </form>
 
+        <!-- Google Services Configuration -->
+        <div class="civic-api-card" id="google-config-card" aria-labelledby="google-config-title">
+          <div class="civic-api-title" id="google-config-title">⚙️ Google Services Setup</div>
+          <p class="civic-api-result" style="margin-bottom:6px">Add your Google API key to enable Maps, Places &amp; Civic Information APIs.</p>
+          <label for="google-api-key-setup">Google API Key</label>
+          <input id="google-api-key-setup" type="password" autocomplete="off" spellcheck="false" maxlength="120" placeholder="AIza…" aria-label="Enter Google API key to activate Google services" />
+          <button class="btn-mini" id="google-key-save-btn" type="button" style="margin-top:6px">Activate Google Services</button>
+          <div id="google-services-status" role="status" aria-live="polite" class="civic-api-result" style="margin-top:6px">
+            <span id="firebase-status-badge" class="service-badge service-badge--pending">⏳ Firebase: Initializing…</span>
+            <span id="maps-status-badge" class="service-badge service-badge--pending">⏳ Maps: Waiting for key</span>
+            <span id="gemini-status-badge" class="service-badge service-badge--pending">⏳ Gemini AI: Waiting for key</span>
+            <span id="bigquery-status-badge" class="service-badge service-badge--pending">⏳ BigQuery: Waiting for key</span>
+            <span id="cloudfn-status-badge" class="service-badge service-badge--pending">⏳ Cloud Functions: Standby</span>
+          </div>
+          <!-- BigQuery project configuration -->
+          <details style="margin-top:8px">
+            <summary style="font-size:0.73rem;color:var(--text-muted);cursor:pointer">Advanced: BigQuery &amp; Cloud Functions</summary>
+            <div style="margin-top:6px">
+              <label for="bq-project-input" style="font-size:0.73rem">BigQuery Project ID</label>
+              <input id="bq-project-input" type="text" autocomplete="off" spellcheck="false" maxlength="80"
+                placeholder="civicguide-app" aria-label="Google Cloud project ID for BigQuery"
+                style="width:100%;padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-deep);color:var(--text-main);margin-top:2px"
+                oninput="window.BQ_PROJECT_ID=this.value.trim()||'civicguide-app'" />
+              <label for="bq-dataset-input" style="font-size:0.73rem;margin-top:4px;display:block">BigQuery Dataset</label>
+              <input id="bq-dataset-input" type="text" autocomplete="off" spellcheck="false" maxlength="80"
+                placeholder="civicguide_analytics" aria-label="BigQuery dataset name"
+                style="width:100%;padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-deep);color:var(--text-main);margin-top:2px"
+                oninput="window.BQ_DATASET=this.value.trim()||'civicguide_analytics'" />
+              <label for="cloudfn-base-input" style="font-size:0.73rem;margin-top:4px;display:block">Cloud Functions Base URL</label>
+              <input id="cloudfn-base-input" type="text" autocomplete="off" spellcheck="false" maxlength="200"
+                placeholder="https://us-central1-civicguide-app.cloudfunctions.net"
+                aria-label="Cloud Functions base URL"
+                style="width:100%;padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-deep);color:var(--text-main);margin-top:2px"
+                oninput="window.CLOUD_FUNCTIONS_BASE=this.value.trim()" />
+            </div>
+          </details>
+          <p style="font-size:0.73rem;color:var(--text-muted);margin-top:4px">
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Get a Google API key →</a>
+          </p>
+        </div>
+
         <!-- Session analytics powered by Firebase -->
         <div class="civic-api-card" id="analytics-card" aria-labelledby="analytics-title">
-          <div class="civic-api-title" id="analytics-title">📊 Firebase Activity</div>
+          <div class="civic-api-title" id="analytics-title">📊 Firebase Analytics</div>
           <div class="analytics-row"><span class="analytics-label">Questions asked</span><span class="analytics-val" id="stat-questions">0</span></div>
           <div class="analytics-row"><span class="analytics-label">Topics explored</span><span class="analytics-val" id="stat-topics">0</span></div>
           <div class="analytics-row"><span class="analytics-label">Map lookups</span><span class="analytics-val" id="stat-maps">0</span></div>
+          <div class="analytics-row"><span class="analytics-label">Firebase</span><span class="analytics-val" id="stat-firebase">—</span></div>
           <div class="analytics-row"><span class="analytics-label">Mode</span><span class="analytics-val" id="stat-mode">—</span></div>
         </div>
       </div>

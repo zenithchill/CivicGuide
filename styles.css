@@ -709,3 +709,47 @@ header {
 .civic-api-title {
   display: flex; align-items: center; gap: 5px;
 }
+
+/* ── Google Services status badges ──────────────────────────── */
+.service-badge {
+  display: block;
+  font-size: 0.7rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+.service-badge--pending {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.45);
+}
+.service-badge--ok {
+  background: rgba(52,168,83,0.15);
+  color: #6fcf97;
+}
+.service-badge--warn {
+  background: rgba(251,188,5,0.12);
+  color: #f0b44a;
+}
+
+/* ── Google Services config card label ─────────────────────── */
+#google-config-card label {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  display: block;
+  margin: 6px 0 2px;
+}
+#google-config-card input {
+  width: 100%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+}
+#google-config-card input:focus {
+  outline: 2px solid var(--gold);
+  border-color: var(--gold);
+}

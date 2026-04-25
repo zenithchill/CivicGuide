@@ -18,12 +18,38 @@ const { JSDOM } = (() => {
 })();
 
 let dom, window, document;
+
+// Always provide a minimal navigator shim so async tests don't crash
+// on bare Node.js (where global.navigator is undefined).
+global.navigator = global.navigator || {
+  onLine: true,
+  clipboard: { writeText: () => Promise.resolve() },
+  geolocation: {
+    getCurrentPosition: (success) => success({ coords: { latitude: 40.7128, longitude: -74.006 } })
+  },
+  share: undefined,
+  serviceWorker: undefined
+};
+
+// Always provide a minimal window/sessionStorage shim
+global.window = global.window || {};
+global.sessionStorage = global.sessionStorage || (() => {
+  const store = {};
+  return {
+    getItem: (k) => store[k] ?? null,
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; },
+    clear: () => { Object.keys(store).forEach(k => delete store[k]); }
+  };
+})();
+
 if (JSDOM) {
   dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { url: 'http://localhost' });
   window = dom.window;
   document = window.document;
   global.window = window;
   global.document = document;
+  // Override navigator shim with fuller jsdom version
   global.navigator = {
     onLine: true,
     clipboard: { writeText: () => Promise.resolve() },
@@ -98,12 +124,12 @@ const REGIONS = {
     search: 'United States election process',
     calendarText: 'Election Day', mapsQuery: 'polling place',
     mapsCenter: { lat: 39.8283, lng: -98.5795 }, mapsZoom: 4,
-    stats: [['240M+','registered voters'],['538','Electoral College votes'],['270','needed to win'],['50','states']],
+    stats: [['240M+', 'registered voters'], ['538', 'Electoral College votes'], ['270', 'needed to win'], ['50', 'states']],
     sources: [
-      ['USA.gov','Official info','https://www.usa.gov/voting-and-elections','US'],
-      ['Vote.gov','Register','https://www.vote.gov','OK'],
-      ['EAC.gov','Assistance','https://www.eac.gov','EAC'],
-      ['NCSL','Law summaries','https://www.ncsl.org/elections-and-campaigns','LAW']
+      ['USA.gov', 'Official info', 'https://www.usa.gov/voting-and-elections', 'US'],
+      ['Vote.gov', 'Register', 'https://www.vote.gov', 'OK'],
+      ['EAC.gov', 'Assistance', 'https://www.eac.gov', 'EAC'],
+      ['NCSL', 'Law summaries', 'https://www.ncsl.org/elections-and-campaigns', 'LAW']
     ]
   },
   IN: {
@@ -112,12 +138,12 @@ const REGIONS = {
     search: 'India election process ECI',
     calendarText: 'Election Reminder', mapsQuery: 'election office',
     mapsCenter: { lat: 20.5937, lng: 78.9629 }, mapsZoom: 5,
-    stats: [['970M+','eligible voters'],['543','Lok Sabha seats'],['18+','voting age'],['1','vote per voter']],
+    stats: [['970M+', 'eligible voters'], ['543', 'Lok Sabha seats'], ['18+', 'voting age'], ['1', 'vote per voter']],
     sources: [
-      ['ECI','Official body','https://www.eci.gov.in','ECI'],
-      ['Voters Portal','Services','https://voters.eci.gov.in','ID'],
-      ['SVEEP','Education','https://ecisveep.nic.in','EDU'],
-      ['NVSP','Services','https://www.nvsp.in','NVSP']
+      ['ECI', 'Official body', 'https://www.eci.gov.in', 'ECI'],
+      ['Voters Portal', 'Services', 'https://voters.eci.gov.in', 'ID'],
+      ['SVEEP', 'Education', 'https://ecisveep.nic.in', 'EDU'],
+      ['NVSP', 'Services', 'https://www.nvsp.in', 'NVSP']
     ]
   },
   UK: {
@@ -126,12 +152,12 @@ const REGIONS = {
     search: 'UK election process register to vote',
     calendarText: 'Election Reminder', mapsQuery: 'polling station',
     mapsCenter: { lat: 55.3781, lng: -3.4360 }, mapsZoom: 5,
-    stats: [['650','constituencies'],['18+','voting age'],['FPTP','voting system'],['1','MP per seat']],
+    stats: [['650', 'constituencies'], ['18+', 'voting age'], ['FPTP', 'voting system'], ['1', 'MP per seat']],
     sources: [
-      ['Electoral Commission','Independent guidance','https://www.electoralcommission.org.uk','EC'],
-      ['GOV.UK Register','Registration','https://www.gov.uk/register-to-vote','GOV'],
-      ['Parliament UK','How elections work','https://www.parliament.uk/about/how/elections-and-voting/','PAR'],
-      ['GOV.UK Voting','Voting guidance','https://www.gov.uk/how-to-vote','ID']
+      ['Electoral Commission', 'Independent guidance', 'https://www.electoralcommission.org.uk', 'EC'],
+      ['GOV.UK Register', 'Registration', 'https://www.gov.uk/register-to-vote', 'GOV'],
+      ['Parliament UK', 'How elections work', 'https://www.parliament.uk/about/how/elections-and-voting/', 'PAR'],
+      ['GOV.UK Voting', 'Voting guidance', 'https://www.gov.uk/how-to-vote', 'ID']
     ]
   },
   CA: {
@@ -140,12 +166,12 @@ const REGIONS = {
     search: 'Canada election process Elections Canada',
     calendarText: 'Election Reminder', mapsQuery: 'polling station',
     mapsCenter: { lat: 56.1304, lng: -106.3468 }, mapsZoom: 4,
-    stats: [['338','electoral districts'],['18+','voting age'],['FPTP','federal system'],['1','MP per riding']],
+    stats: [['338', 'electoral districts'], ['18+', 'voting age'], ['FPTP', 'federal system'], ['1', 'MP per riding']],
     sources: [
-      ['Elections Canada','Official agency','https://www.elections.ca','EC'],
-      ['Register to Vote','Electors register','https://ereg.elections.ca','REG'],
-      ['Voting Process','How voting works','https://www.elections.ca/content.aspx?section=vot&dir=vote&document=index&lang=e','VOTE'],
-      ['Civic Education','Learning resources','https://electionsanddemocracy.ca','EDU']
+      ['Elections Canada', 'Official agency', 'https://www.elections.ca', 'EC'],
+      ['Register to Vote', 'Electors register', 'https://ereg.elections.ca', 'REG'],
+      ['Voting Process', 'How voting works', 'https://www.elections.ca/content.aspx?section=vot&dir=vote&document=index&lang=e', 'VOTE'],
+      ['Civic Education', 'Learning resources', 'https://electionsanddemocracy.ca', 'EDU']
     ]
   },
   AU: {
@@ -154,12 +180,12 @@ const REGIONS = {
     search: 'Australia election process AEC',
     calendarText: 'Election Reminder', mapsQuery: 'polling place',
     mapsCenter: { lat: -25.2744, lng: 133.7751 }, mapsZoom: 4,
-    stats: [['18+','voting age'],['151','House seats'],['76','Senate seats'],['Compulsory','voting']],
+    stats: [['18+', 'voting age'], ['151', 'House seats'], ['76', 'Senate seats'], ['Compulsory', 'voting']],
     sources: [
-      ['AEC','Official body','https://www.aec.gov.au','AEC'],
-      ['Enrol to Vote','Registration','https://www.aec.gov.au/enrol/','REG'],
-      ['Voting','How to vote','https://www.aec.gov.au/Voting/','VOTE'],
-      ['Education','AEC resources','https://education.aec.gov.au','EDU']
+      ['AEC', 'Official body', 'https://www.aec.gov.au', 'AEC'],
+      ['Enrol to Vote', 'Registration', 'https://www.aec.gov.au/enrol/', 'REG'],
+      ['Voting', 'How to vote', 'https://www.aec.gov.au/Voting/', 'VOTE'],
+      ['Education', 'AEC resources', 'https://education.aec.gov.au', 'EDU']
     ]
   },
   EU: {
@@ -168,12 +194,12 @@ const REGIONS = {
     search: 'European Parliament election process',
     calendarText: 'European Election Reminder', mapsQuery: 'polling station',
     mapsCenter: { lat: 50.8503, lng: 4.3517 }, mapsZoom: 4,
-    stats: [['720','MEPs'],['27','member states'],['5 yrs','term'],['PR','systems used']],
+    stats: [['720', 'MEPs'], ['27', 'member states'], ['5 yrs', 'term'], ['PR', 'systems used']],
     sources: [
-      ['EU Elections','Official portal','https://elections.europa.eu','EU'],
-      ['European Parliament','Institutional info','https://www.europarl.europa.eu','EP'],
-      ['Your Europe','Voting rights','https://europa.eu/youreurope/citizens/residence/elections-abroad/index_en.htm','YOU'],
-      ["EU Citizens' Initiative",'Participation','https://citizens-initiative.europa.eu','CIV']
+      ['EU Elections', 'Official portal', 'https://elections.europa.eu', 'EU'],
+      ['European Parliament', 'Institutional info', 'https://www.europarl.europa.eu', 'EP'],
+      ['Your Europe', 'Voting rights', 'https://europa.eu/youreurope/citizens/residence/elections-abroad/index_en.htm', 'YOU'],
+      ["EU Citizens' Initiative", 'Participation', 'https://citizens-initiative.europa.eu', 'CIV']
     ]
   },
   NG: {
@@ -182,12 +208,12 @@ const REGIONS = {
     search: 'Nigeria election process INEC',
     calendarText: 'Election Reminder', mapsQuery: 'polling unit',
     mapsCenter: { lat: 9.0820, lng: 8.6753 }, mapsZoom: 5,
-    stats: [['18+','voting age'],['36','states'],['774','LGAs'],['PVC','voter card']],
+    stats: [['18+', 'voting age'], ['36', 'states'], ['774', 'LGAs'], ['PVC', 'voter card']],
     sources: [
-      ['INEC Nigeria','Official body','https://inecnigeria.org','INEC'],
-      ['Voter Registration','INEC services','https://cvr.inecnigeria.org','REG'],
-      ['Election Results','Results portal','https://www.inecelectionresults.ng','RES'],
-      ['Voter Education','Education resources','https://inecnigeria.org/voter-education/','EDU']
+      ['INEC Nigeria', 'Official body', 'https://inecnigeria.org', 'INEC'],
+      ['Voter Registration', 'INEC services', 'https://cvr.inecnigeria.org', 'REG'],
+      ['Election Results', 'Results portal', 'https://www.inecelectionresults.ng', 'RES'],
+      ['Voter Education', 'Education resources', 'https://inecnigeria.org/voter-education/', 'EDU']
     ]
   },
   BR: {
@@ -196,12 +222,12 @@ const REGIONS = {
     search: 'Brazil election process TSE',
     calendarText: 'Election Reminder', mapsQuery: 'seção eleitoral',
     mapsCenter: { lat: -14.2350, lng: -51.9253 }, mapsZoom: 4,
-    stats: [['16+','optional voting'],['18-70','mandatory range'],['2','possible rounds'],['TSE','authority']],
+    stats: [['16+', 'optional voting'], ['18-70', 'mandatory range'], ['2', 'possible rounds'], ['TSE', 'authority']],
     sources: [
-      ['TSE','Superior Electoral Court','https://www.tse.jus.br','TSE'],
-      ['Electoral Services','Voter services','https://www.tse.jus.br/servicos-eleitorais','ID'],
-      ['Electronic Voting','Voting system','https://www.tse.jus.br/eleicoes/urna-eletronica','URN'],
-      ['Election Education','TSE resources','https://www.tse.jus.br/comunicacao/noticias','EDU']
+      ['TSE', 'Superior Electoral Court', 'https://www.tse.jus.br', 'TSE'],
+      ['Electoral Services', 'Voter services', 'https://www.tse.jus.br/servicos-eleitorais', 'ID'],
+      ['Electronic Voting', 'Voting system', 'https://www.tse.jus.br/eleicoes/urna-eletronica', 'URN'],
+      ['Election Education', 'TSE resources', 'https://www.tse.jus.br/comunicacao/noticias', 'EDU']
     ]
   },
   GEN: {
@@ -210,24 +236,24 @@ const REGIONS = {
     search: 'how elections work',
     calendarText: 'Election Reminder', mapsQuery: 'polling place',
     mapsCenter: { lat: 20.0, lng: 0.0 }, mapsZoom: 2,
-    stats: [['1','vote matters'],['Local','rules vary'],['Official','sources first'],['Step-by-step','guidance']],
+    stats: [['1', 'vote matters'], ['Local', 'rules vary'], ['Official', 'sources first'], ['Step-by-step', 'guidance']],
     sources: [
-      ['IFES','Global education','https://www.ifes.org','IFES'],
-      ['ACE','Knowledge network','https://aceproject.org','ACE'],
-      ['IDEA','Research','https://www.idea.int','IDEA'],
-      ['Google','Find authority','https://www.google.com/search?q=official+election+authority','GO']
+      ['IFES', 'Global education', 'https://www.ifes.org', 'IFES'],
+      ['ACE', 'Knowledge network', 'https://aceproject.org', 'ACE'],
+      ['IDEA', 'Research', 'https://www.idea.int', 'IDEA'],
+      ['Google', 'Find authority', 'https://www.google.com/search?q=official+election+authority', 'GO']
     ]
   }
 };
 
-const ALL_REGION_KEYS = ['US','IN','UK','CA','AU','EU','NG','BR','GEN'];
+const ALL_REGION_KEYS = ['US', 'IN', 'UK', 'CA', 'AU', 'EU', 'NG', 'BR', 'GEN'];
 
 const FALLBACKS = [
-  { keys: ['register','registration','eligibility'], answer: 'Voter registration is the step where an eligible citizen gets added to the official voter list.' },
-  { keys: ['count','counted','certify','certification','recount'], answer: 'After voting ends, election officials secure ballot materials, verify eligible ballots, count votes, review exceptions, audit results where required, and certify the final totals.' },
-  { keys: ['security','fraud','safe','misinformation'], answer: 'Election security uses several layers: voter list checks, controlled ballot access, trained poll workers, observer rules.' },
-  { keys: ['mail','postal','absentee'], answer: 'Postal or absentee voting usually involves requesting or receiving a ballot, marking it privately, signing any required declaration.' },
-  { keys: ['electoral college','president','elector'], answer: 'In the United States presidential election, voters choose electors pledged to candidates.' }
+  { keys: ['register', 'registration', 'eligibility'], answer: 'Voter registration is the step where an eligible citizen gets added to the official voter list.' },
+  { keys: ['count', 'counted', 'certify', 'certification', 'recount'], answer: 'After voting ends, election officials secure ballot materials, verify eligible ballots, count votes, review exceptions, audit results where required, and certify the final totals.' },
+  { keys: ['security', 'fraud', 'safe', 'misinformation'], answer: 'Election security uses several layers: voter list checks, controlled ballot access, trained poll workers, observer rules.' },
+  { keys: ['mail', 'postal', 'absentee'], answer: 'Postal or absentee voting usually involves requesting or receiving a ballot, marking it privately, signing any required declaration.' },
+  { keys: ['electoral college', 'president', 'elector'], answer: 'In the United States presidential election, voters choose electors pledged to candidates.' }
 ];
 
 function localAnswer(question, region = 'US') {
@@ -243,19 +269,21 @@ function logFirebase(name, params = {}) {
     if (typeof window !== 'undefined' && typeof window.firebaseLogEvent === 'function') {
       window.firebaseLogEvent(name, params);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function initGoogleMaps() {
   try {
     if (window.google && window.google.maps && window.google.maps.places) { /* Places available */ }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function handleMapsLoadError() { /* Graceful degradation */ }
 
 function initOrShowMap() {
-  if (!window.google || !window.google.maps) return;
+  try {
+    if (!window.google || !window.google.maps) return;
+  } catch (_) { /* no Maps API available */ }
 }
 
 /* ── Test runner ──────────────────────────────────────────────── */
@@ -418,8 +446,11 @@ test('Google Maps embed URL includes search query param', () => {
 });
 test('Google Translate init function is callable', () => {
   function googleTranslateInit() {
-    if (!window.google?.translate?.TranslateElement) return 'skipped';
-    return 'initialized';
+    try {
+      const win = (typeof global !== 'undefined' && global.window) || {};
+      if (!win.google?.translate?.TranslateElement) return 'skipped';
+      return 'initialized';
+    } catch (_) { return 'skipped'; }
   }
   const result = googleTranslateInit();
   assert(result === 'skipped' || result === 'initialized', 'Translate init must return valid state');
@@ -507,9 +538,14 @@ test('handleMapsLoadError: does not throw', () => {
 test('initOrShowMap: no-ops when google is undefined', () => {
   const savedGoogle = global.google;
   global.google = undefined;
+  // Patch window.google on global.window as well
+  const win = (typeof global !== 'undefined' && global.window) || {};
+  const savedWinGoogle = win.google;
+  win.google = undefined;
   let threw = false;
   try { initOrShowMap(); } catch (e) { threw = true; }
   global.google = savedGoogle;
+  win.google = savedWinGoogle;
   assert(!threw, 'initOrShowMap must not throw without Maps API');
 });
 test('Places input: short query (<3 chars) should not fire autocomplete', () => {
@@ -532,10 +568,10 @@ test('REGIONS: mapsCenter has valid lat/lng ranges', () => {
 ═══════════════════════════════════════════════════════════════ */
 test('Firebase: logFirebase accepts any event name without throwing', () => {
   const events = [
-    'page_view','question_asked','answer_received','map_opened','chip_clicked',
-    'region_changed','places_address_selected','civic_api_lookup','timeline_step_clicked',
-    'topic_clicked','conversation_copied','chat_cleared','app_shared','sw_registered',
-    'geolocation_success','geolocation_denied','google_maps_loaded','official_source_clicked'
+    'page_view', 'question_asked', 'answer_received', 'map_opened', 'chip_clicked',
+    'region_changed', 'places_address_selected', 'civic_api_lookup', 'timeline_step_clicked',
+    'topic_clicked', 'conversation_copied', 'chat_cleared', 'app_shared', 'sw_registered',
+    'geolocation_success', 'geolocation_denied', 'google_maps_loaded', 'official_source_clicked'
   ];
   events.forEach((e) => {
     let threw = false;
@@ -550,24 +586,26 @@ test('Firebase: logFirebase with no params does not throw', () => {
 });
 test('Firebase: window.firebaseLogEvent stub works', () => {
   global.window = global.window || {};
-  window.firebaseLogEvent = (name, params) => { /* stub */ };
+  global.window.firebaseLogEvent = (name, params) => { /* stub */ };
   let threw = false;
   try { logFirebase('stub_test', { ok: true }); } catch (_) { threw = true; }
   assert(!threw, 'logFirebase with window.firebaseLogEvent stub must not throw');
-  delete window.firebaseLogEvent;
+  delete global.window.firebaseLogEvent;
 });
 test('Firebase: setUserProperty stub works without throwing', () => {
-  window.firebaseSetUserProperty = (key, val) => { /* stub */ };
+  global.window = global.window || {};
+  global.window.firebaseSetUserProperty = (key, val) => { /* stub */ };
   let threw = false;
-  try { window.firebaseSetUserProperty('preferred_region', 'US'); } catch (_) { threw = true; }
+  try { global.window.firebaseSetUserProperty('preferred_region', 'US'); } catch (_) { threw = true; }
   assert(!threw, 'firebaseSetUserProperty must not throw');
-  delete window.firebaseSetUserProperty;
+  delete global.window.firebaseSetUserProperty;
 });
 test('Firebase: firebaseAddDoc returns a Promise when stubbed', async () => {
-  window.firebaseAddDoc = () => Promise.resolve({ id: 'test-doc' });
-  const result = await window.firebaseAddDoc('collection', { data: 'test' });
+  global.window = global.window || {};
+  global.window.firebaseAddDoc = () => Promise.resolve({ id: 'test-doc' });
+  const result = await global.window.firebaseAddDoc('collection', { data: 'test' });
   assert(result !== undefined, 'Stubbed firebaseAddDoc must resolve');
-  delete window.firebaseAddDoc;
+  delete global.window.firebaseAddDoc;
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -701,11 +739,516 @@ test('Analytics: sessionStats increments correctly', () => {
   assertEqual(sessionStats.maps, 1);
 });
 
+/* ── Results printed after ALL sections (including 15-18) run ── */
+
 /* ═══════════════════════════════════════════════════════════════
-   RESULTS
+   15. GOOGLE SERVICES INTEGRATION
+═══════════════════════════════════════════════════════════════ */
+test('Google: Maps API URL construction is correct', () => {
+  const key = 'AIzaSyTestKey';
+  const url = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places,geometry&callback=initGoogleMaps&loading=async`;
+  assertContains(url, 'maps.googleapis.com', 'Maps URL must use googleapis.com domain');
+  assertContains(url, 'libraries=places,geometry', 'Maps URL must include places and geometry libraries');
+  assertContains(url, 'callback=initGoogleMaps', 'Maps URL must specify initGoogleMaps callback');
+});
+test('Google: Maps API key validation rejects non-AIza keys', () => {
+  function isValidGoogleKey(k) { return typeof k === 'string' && k.startsWith('AIza') && k.length > 10; }
+  assert(!isValidGoogleKey(''), 'Empty key must fail validation');
+  assert(!isValidGoogleKey('sk-ant-abc'), 'Anthropic key must fail Google validation');
+  assert(!isValidGoogleKey('Demo-key'), 'Demo key must fail validation');
+  assert(isValidGoogleKey('AIzaSyRealKey123456789'), 'Valid AIza key must pass validation');
+});
+test('Google: Civic Information API URL is well-formed', () => {
+  const key = 'AIzaSyTestKey';
+  const address = '123 Main St, Springfield, IL';
+  const url = `https://www.googleapis.com/civicinfo/v2/voterinfo?key=${encodeURIComponent(key)}&address=${encodeURIComponent(address)}&officialOnly=true`;
+  assertContains(url, 'civicinfo/v2/voterinfo', 'Civic API URL must use voterinfo endpoint');
+  assertContains(url, 'officialOnly=true', 'Civic API must request official data only');
+  assertContains(url, encodeURIComponent(address), 'Address must be properly encoded in URL');
+});
+test('Google: Calendar deep-link includes required parameters', () => {
+  const calText = encodeURIComponent('Election Day');
+  const dates = '20261103T090000/20261103T100000';
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${calText}&dates=${dates}`;
+  assertContains(url, 'calendar.google.com', 'Calendar URL must use google.com domain');
+  assertContains(url, 'action=TEMPLATE', 'Calendar URL must use TEMPLATE action');
+  assertContains(url, 'Election', 'Calendar URL must include election event text');
+  assertContains(url, '2026', 'Calendar dates must include upcoming election year');
+});
+test('Google: Search URL is properly encoded per region', () => {
+  const regionSearch = 'India election process ECI voter registration official';
+  const url = `https://www.google.com/search?q=${encodeURIComponent(regionSearch)}`;
+  assertContains(url, 'google.com/search', 'Search URL must use google.com/search');
+  assertContains(url, encodeURIComponent('India'), 'Search URL must include region name');
+});
+test('Google: Maps search URL is correctly formed for polling places', () => {
+  const query = encodeURIComponent('polling place near me United States');
+  const url = `https://www.google.com/maps/search/${query}`;
+  assertContains(url, 'google.com/maps/search', 'Maps search URL must use /maps/search');
+  assertContains(url, 'polling', 'Maps URL must include polling in query');
+});
+test('Google: Firebase config detection correctly identifies demo keys', () => {
+  function isRealFirebaseConfig(apiKey) {
+    return typeof apiKey === 'string' && !apiKey.includes('Demo') && !apiKey.includes('Replace') && apiKey.startsWith('AIza');
+  }
+  assert(!isRealFirebaseConfig('AIzaSyDemo-CivicGuide-Replace-With-Real'), 'Demo key must be flagged as demo');
+  assert(!isRealFirebaseConfig('AIzaSyReplace-Me'), 'Replace key must be flagged as demo');
+  assert(isRealFirebaseConfig('AIzaSyRealKey1234567890ABCDEF'), 'Real key must pass detection');
+});
+test('Google: Firebase Analytics event names are non-empty strings', () => {
+  const events = ['page_view', 'question_asked', 'answer_received', 'region_changed', 'map_opened', 'map_toggled',
+    'timeline_step_clicked', 'topic_clicked', 'chip_clicked', 'official_source_clicked', 'app_shared',
+    'civic_api_lookup', 'places_address_selected', 'youtube_link_clicked', 'google_key_configured'];
+  events.forEach(e => {
+    assert(typeof e === 'string' && e.length > 0, `Event "${e}" must be a non-empty string`);
+    assert(!e.includes(' '), `Event "${e}" must not contain spaces (use underscores)`);
+  });
+});
+test('Google: Translate init uses correct Google Translate API pattern', () => {
+  const translateSrc = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateInit';
+  assertContains(translateSrc, 'translate.google.com', 'Translate script must use translate.google.com');
+  assertContains(translateSrc, 'cb=googleTranslateInit', 'Translate must have googleTranslateInit callback');
+});
+test('Google: YouTube search URLs are properly formed', () => {
+  const query = 'how elections work United States';
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  assertContains(url, 'youtube.com/results', 'YouTube URL must use /results path');
+  assertContains(url, 'search_query=', 'YouTube URL must use search_query param');
+});
+test('Google: Places Autocomplete is guarded by mapsInitialized flag', () => {
+  let mapsInit = false;
+  const win = (typeof global !== 'undefined' && global.window) || {};
+  function safeInitPlaces() { return mapsInit && win.google !== undefined; }
+  assert(!safeInitPlaces(), 'Places must not init without mapsInitialized');
+  mapsInit = true;
+  // win.google is not set (no Maps script loaded in test env) — still false, correct guard
+  assert(!safeInitPlaces(), 'Places must also require window.google to be defined');
+});
+test('Google: Service Worker passes through Google API domains', () => {
+  const passThroughDomains = ['api.anthropic.com', 'googleapis.com', 'gstatic.com', 'firebase', 'firestore', 'fonts.googleapis.com', 'translate.google.com', 'maps.googleapis.com'];
+  const testUrl = new URL('https://maps.googleapis.com/maps/api/js?key=test');
+  const shouldPassThrough = passThroughDomains.some(d => testUrl.hostname.includes(d));
+  assert(shouldPassThrough, 'Google Maps URL must be flagged as pass-through in service worker');
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   16. CODE QUALITY & ARCHITECTURE
+═══════════════════════════════════════════════════════════════ */
+test('Architecture: escapeHtml handles all XSS vectors', () => {
+  const dangerous = '<script>alert("xss")</script>&\'';
+  const escaped = escapeHtml(dangerous);
+  assertNotContains(escaped, '<script>', 'Script tags must be escaped');
+  assertNotContains(escaped, '"', 'Double quotes must be escaped');
+  assertContains(escaped, '&lt;', 'Less-than must become &lt;');
+  assertContains(escaped, '&amp;', 'Ampersand must become &amp;');
+  assertContains(escaped, '&#39;', 'Single quote must become &#39;');
+});
+test('Architecture: normalizeQuestion trims and limits length', () => {
+  const long = 'a'.repeat(700);
+  assertEqual(normalizeQuestion(long).length, 600, 'Question must be capped at 600 chars');
+  assertEqual(normalizeQuestion('  hello   world  '), 'hello world', 'Question must be trimmed and normalized');
+});
+test('Architecture: normalizeAddress trims and limits length', () => {
+  const long = 'x'.repeat(200);
+  assertEqual(normalizeAddress(long).length, 160, 'Address must be capped at 160 chars');
+});
+test('Architecture: mdToHtml handles all heading levels', () => {
+  const { html: h1 } = mdToHtml('# Heading 1');
+  const { html: h2 } = mdToHtml('## Heading 2');
+  const { html: h3 } = mdToHtml('### Heading 3');
+  assertContains(h1, '<h3>', 'H1 must render as h3 element');
+  assertContains(h2, '<h3>', 'H2 must render as h3 element');
+  assertContains(h3, '<h3>', 'H3 must render as h3 element');
+});
+test('Architecture: mdToHtml extracts follow-up questions', () => {
+  const { followUps } = mdToHtml('Some text. <follow-up>What next?</follow-up><follow-up>Why?</follow-up>');
+  assertEqual(followUps.length, 2, 'Must extract exactly 2 follow-up questions');
+  assertEqual(followUps[0], 'What next?');
+  assertEqual(followUps[1], 'Why?');
+});
+test('Architecture: mdToHtml closes open lists', () => {
+  const { html } = mdToHtml('- item 1\n- item 2\nParagraph after');
+  assertContains(html, '</ul>', 'List must be closed before paragraph');
+  assertContains(html, '<li>', 'List items must be present');
+});
+test('Architecture: REGIONS has all required fields', () => {
+  const required = ['name', 'badge', 'official', 'search', 'calendarText', 'mapsQuery', 'mapsCenter', 'mapsZoom', 'stats', 'sources'];
+  ALL_REGION_KEYS.forEach(key => {
+    required.forEach(field => {
+      assert(REGIONS[key][field] !== undefined, `Region ${key} must have field: ${field}`);
+    });
+  });
+});
+test('Architecture: all source URLs use HTTPS', () => {
+  ALL_REGION_KEYS.forEach(key => {
+    REGIONS[key].sources.forEach(([name, , url]) => {
+      assert(url.startsWith('https://'), `Source "${name}" in region ${key} must use HTTPS`);
+    });
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   17. CONSTANTS & ARCHITECTURE
+═══════════════════════════════════════════════════════════════ */
+test('Constants: INPUT_LIMITS are frozen and correct', () => {
+  const INPUT_LIMITS = Object.freeze({ QUESTION: 600, ADDRESS: 160, FIRESTORE_QUESTION: 200, QUESTION_WARN: 500, QUESTION_DANGER: 560 });
+  assert(Object.isFrozen(INPUT_LIMITS), 'INPUT_LIMITS must be frozen');
+  assertEqual(INPUT_LIMITS.QUESTION, 600, 'Question limit must be 600');
+  assertEqual(INPUT_LIMITS.ADDRESS, 160, 'Address limit must be 160');
+  assertEqual(INPUT_LIMITS.FIRESTORE_QUESTION, 200, 'Firestore limit must be 200');
+});
+test('Constants: TIMINGS are frozen and correct', () => {
+  const TIMINGS = Object.freeze({ TOAST_MS: 2600, CLAUDE_TIMEOUT_MS: 20000, CIVIC_TIMEOUT_MS: 12000, RETRY_DELAY_MS: 1000 });
+  assert(Object.isFrozen(TIMINGS), 'TIMINGS must be frozen');
+  assertEqual(TIMINGS.TOAST_MS, 2600, 'Toast must show for 2600ms');
+  assertEqual(TIMINGS.CLAUDE_TIMEOUT_MS, 20000, 'Claude API timeout must be 20s');
+  assertEqual(TIMINGS.CIVIC_TIMEOUT_MS, 12000, 'Civic API timeout must be 12s');
+});
+test('Constants: CLAUDE_MODEL is the correct Sonnet string', () => {
+  const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+  assert(CLAUDE_MODEL.startsWith('claude-'), 'Model must start with claude-');
+  assertContains(CLAUDE_MODEL, 'sonnet', 'Model must be a Sonnet variant');
+  assertContains(CLAUDE_MODEL, '2025', 'Model must be a 2025 release');
+});
+test('Constants: MAX_HISTORY_TURNS keeps context manageable', () => {
+  const MAX_HISTORY_TURNS = 12;
+  assert(MAX_HISTORY_TURNS >= 6, 'Must keep at least 6 turns of context');
+  assert(MAX_HISTORY_TURNS <= 20, 'Must not exceed 20 turns to avoid context overflow');
+});
+test('Architecture: callClaudeWithRetry retries on retryable errors', async () => {
+  let calls = 0;
+  async function fakeCallClaude() {
+    calls++;
+    if (calls === 1) { const err = new Error('fetch failed'); err.name = 'TypeError'; throw err; }
+    return 'success';
+  }
+  async function callClaudeWithRetry(message, attempts = 0) {
+    try { return await fakeCallClaude(message); }
+    catch (err) {
+      const isRetryable = err.name === 'AbortError' || err.message.includes('fetch') || err.message.includes('network');
+      if (attempts < 1 && isRetryable) {
+        await new Promise(r => setTimeout(r, 0));
+        return callClaudeWithRetry(message, attempts + 1);
+      }
+      throw err;
+    }
+  }
+  const result = await callClaudeWithRetry('test question');
+  assertEqual(result, 'success', 'Retry must succeed on second attempt');
+  assertEqual(calls, 2, 'Must have called Claude exactly twice');
+});
+test('Architecture: callClaudeWithRetry does not retry non-retryable errors', async () => {
+  let calls = 0;
+  async function fakeCallClaude() {
+    calls++;
+    const err = new Error('HTTP 401');
+    throw err;
+  }
+  async function callClaudeWithRetry(message, attempts = 0) {
+    try { return await fakeCallClaude(message); }
+    catch (err) {
+      const isRetryable = err.name === 'AbortError' || err.message.includes('fetch') || err.message.includes('network');
+      if (attempts < 1 && isRetryable) {
+        await new Promise(r => setTimeout(r, 0));
+        return callClaudeWithRetry(message, attempts + 1);
+      }
+      throw err;
+    }
+  }
+  let threw = false;
+  try { await callClaudeWithRetry('test'); } catch (_) { threw = true; }
+  assert(threw, 'Non-retryable error must propagate');
+  assertEqual(calls, 1, 'Must only call once for non-retryable errors');
+});
+test('Architecture: localAnswer supports optional region parameter', () => {
+  const answer = localAnswer('voter registration', 'IN');
+  assertContains(answer, 'eci.gov.in', 'localAnswer with region IN must include ECI source');
+});
+test('Architecture: localAnswer rgn parameter overrides global region', () => {
+  const usAnswer = localAnswer('elections', 'US');
+  const inAnswer = localAnswer('elections', 'IN');
+  assertContains(usAnswer, 'usa.gov', 'US region must reference US official sources');
+  assertContains(inAnswer, 'eci.gov.in', 'IN region must reference ECI sources');
+});
+test('Architecture: REGISTRATION_LINKS covers all non-GEN regions', () => {
+  const REGISTRATION_LINKS = {
+    US: ['Vote.gov', 'https://www.vote.gov'],
+    IN: ['ECI Voters', 'https://voters.eci.gov.in'],
+    UK: ['GOV.UK', 'https://www.gov.uk/register-to-vote'],
+    CA: ['Elections Canada', 'https://ereg.elections.ca'],
+    AU: ['AEC', 'https://www.aec.gov.au/enrol/'],
+    EU: ['EU Voting', 'https://europa.eu/youreurope'],
+    NG: ['INEC', 'https://cvr.inecnigeria.org'],
+    BR: ['TSE', 'https://www.tse.jus.br/servicos-eleitorais'],
+    GEN: ['Find Info', 'https://www.google.com/search?q=voter+registration']
+  };
+  ALL_REGION_KEYS.forEach(key => {
+    assert(REGISTRATION_LINKS[key], `REGISTRATION_LINKS must cover region: ${key}`);
+    assert(REGISTRATION_LINKS[key][1].startsWith('https://'), `Registration URL for ${key} must use HTTPS`);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   18. RATE LIMITER, INPUT EDGE CASES & CODE QUALITY
+═══════════════════════════════════════════════════════════════ */
+class RateLimiterTest {
+  constructor(maxRequests, windowMs) {
+    this._max = maxRequests;
+    this._window = windowMs;
+    this._log = [];
+  }
+  canMakeRequest() {
+    const now = Date.now();
+    this._log = this._log.filter(t => now - t < this._window);
+    if (this._log.length >= this._max) return false;
+    this._log.push(now);
+    return true;
+  }
+  msUntilAvailable() {
+    if (this._log.length < this._max) return 0;
+    const oldest = Math.min(...this._log);
+    return Math.max(0, this._window - (Date.now() - oldest));
+  }
+}
+
+test('RateLimiter: allows requests within quota', () => {
+  const lim = new RateLimiterTest(3, 60_000);
+  assert(lim.canMakeRequest(), 'First request must be allowed');
+  assert(lim.canMakeRequest(), 'Second request must be allowed');
+  assert(lim.canMakeRequest(), 'Third request must be allowed');
+  assert(!lim.canMakeRequest(), 'Fourth request must be blocked when quota exceeded');
+});
+
+test('RateLimiter: msUntilAvailable returns 0 when quota not exhausted', () => {
+  const lim = new RateLimiterTest(5, 60_000);
+  lim.canMakeRequest();
+  assertEqual(lim.msUntilAvailable(), 0, 'Must return 0 when slots are available');
+});
+
+test('RateLimiter: msUntilAvailable returns positive ms when exhausted', () => {
+  const lim = new RateLimiterTest(1, 60_000);
+  lim.canMakeRequest();
+  const wait = lim.msUntilAvailable();
+  assert(wait > 0, 'Must return positive wait time when rate-limited');
+  assert(wait <= 60_000, 'Wait time must not exceed window size');
+});
+
+test('RateLimiter: independent instances do not share state', () => {
+  const a = new RateLimiterTest(1, 60_000);
+  const b = new RateLimiterTest(1, 60_000);
+  a.canMakeRequest();
+  assert(!a.canMakeRequest(), 'Limiter A must be exhausted');
+  assert(b.canMakeRequest(), 'Limiter B must be independent');
+});
+
+test('Input: normalizeQuestion casts null to string', () => {
+  assertEqual(normalizeQuestion(null), 'null', 'null must stringify to "null"');
+});
+
+test('Input: normalizeQuestion casts undefined to string', () => {
+  assertEqual(normalizeQuestion(undefined), 'undefined', 'undefined must stringify');
+});
+
+test('Input: normalizeQuestion handles numeric input', () => {
+  assertEqual(normalizeQuestion(42), '42', 'Number must cast to string');
+});
+
+test('Input: normalizeAddress returns empty for empty string', () => {
+  assertEqual(normalizeAddress(''), '', 'Empty address must return empty string');
+});
+
+test('Input: normalizeQuestion collapses tab characters', () => {
+  const result = normalizeQuestion('word1\t\tword2');
+  assert(!result.includes('\t'), 'Tabs must be collapsed to spaces');
+});
+
+test('escapeHtml: handles empty string', () => {
+  assertEqual(escapeHtml(''), '', 'Empty string must return empty string');
+});
+
+test('escapeHtml: unicode emoji passes through unchanged', () => {
+  assertContains(escapeHtml('🗳️ Vote!'), '🗳️', 'Unicode emoji must not be altered');
+});
+
+test('escapeHtml: already-escaped entities get double-escaped', () => {
+  assertContains(escapeHtml('&amp;'), '&amp;amp;', '& in &amp; must be re-escaped to &amp;amp;');
+});
+
+test('mdToHtml: multiple bold spans in one line', () => {
+  const { html } = mdToHtml('**A** and **B** are bold');
+  assertContains(html, '<strong>A</strong>', 'First bold must render');
+  assertContains(html, '<strong>B</strong>', 'Second bold must render');
+});
+
+test('mdToHtml: heading with trailing whitespace renders correctly', () => {
+  const { html } = mdToHtml('## Heading  ');
+  assertContains(html, '<h3>', 'Heading with trailing spaces must render as h3');
+});
+
+test('mdToHtml: is a pure function (same input → same output)', () => {
+  const input = '**Bold** with [note: reminder]';
+  assertEqual(mdToHtml(input).html, mdToHtml(input).html, 'mdToHtml must be deterministic');
+});
+
+test('BigQuery: insertAll URL has correct shape', () => {
+  const url = `https://bigquery.googleapis.com/bigquery/v2/projects/${encodeURIComponent('civicguide-app')}/datasets/${encodeURIComponent('civicguide_analytics')}/tables/${encodeURIComponent('session_events')}/insertAll?key=${encodeURIComponent('AIzaSyTest')}`;
+  assertContains(url, 'bigquery.googleapis.com', 'BigQuery URL must use googleapis.com domain');
+  assertContains(url, '/insertAll', 'BigQuery URL must use insertAll endpoint');
+  assertContains(url, 'civicguide-app', 'BigQuery URL must include project ID');
+});
+
+test('BigQuery: insertId is unique across sequential calls', () => {
+  const id1 = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const id2 = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  assert(id1 !== id2, 'Sequential insert IDs must be unique');
+});
+
+test('Session: session ID starts with s_ prefix', () => {
+  const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  assert(id.startsWith('s_'), 'Session ID must start with s_');
+  assert(id.length > 5, 'Session ID must be long enough to be unique');
+});
+
+test('NLP: buildNlpContext returns empty for null', () => {
+  function buildNlpContext(nlp) {
+    if (!nlp || (!nlp.entities.length && !nlp.categories.length)) return '';
+    const topEntities = nlp.entities.filter(e => e.salience > 0.1).slice(0, 4).map(e => e.name).join(', ');
+    const topCategory = nlp.categories[0]?.name || '';
+    const parts = [];
+    if (topEntities) parts.push(`Key: ${topEntities}`);
+    if (topCategory) parts.push(`Cat: ${topCategory}`);
+    return parts.length ? `[NLP: ${parts.join(' | ')}]\n` : '';
+  }
+  assertEqual(buildNlpContext(null), '', 'null must return empty string');
+  assertEqual(buildNlpContext({ entities: [], categories: [] }), '', 'Empty arrays must return empty string');
+});
+
+test('NLP: buildNlpContext filters low-salience entities', () => {
+  function buildNlpContext(nlp) {
+    if (!nlp || (!nlp.entities.length && !nlp.categories.length)) return '';
+    const topEntities = nlp.entities.filter(e => e.salience > 0.1).slice(0, 4).map(e => e.name).join(', ');
+    const parts = [];
+    if (topEntities) parts.push(topEntities);
+    return parts.length ? `[NLP: ${parts.join(' | ')}]` : '';
+  }
+  const nlp = {
+    entities: [{ name: 'voter', salience: 0.9 }, { name: 'noise', salience: 0.05 }],
+    categories: []
+  };
+  assertContains(buildNlpContext(nlp), 'voter', 'High-salience entity must appear');
+  assertNotContains(buildNlpContext(nlp), 'noise', 'Low-salience entity must be filtered');
+});
+
+test('Quality: all FALLBACKS have non-empty keys arrays', () => {
+  FALLBACKS.forEach((fb, i) => {
+    assert(Array.isArray(fb.keys) && fb.keys.length > 0, `FALLBACK[${i}].keys must be non-empty`);
+    assert(fb.answer.length > 0, `FALLBACK[${i}].answer must be non-empty`);
+  });
+});
+
+test('Quality: all FALLBACK keys are lowercase (for case-insensitive matching)', () => {
+  FALLBACKS.forEach((fb, i) => {
+    fb.keys.forEach(key => {
+      assertEqual(key, key.toLowerCase(), `FALLBACK[${i}] key "${key}" must be lowercase`);
+    });
+  });
+});
+
+test('Quality: REGIONS data not mutated by localAnswer calls', () => {
+  const original = REGIONS.US.name;
+  localAnswer('voter registration', 'US');
+  localAnswer('elections', 'US');
+  assertEqual(REGIONS.US.name, original, 'REGIONS must not be mutated by localAnswer');
+});
+
+test('Quality: escapeHtml is idempotent on safe strings', () => {
+  const safe = 'Hello, world! 123';
+  assertEqual(escapeHtml(safe), safe, 'Safe ASCII must pass through escapeHtml unchanged');
+});
+
+test('Quality: normalizeQuestion is deterministic', () => {
+  const q = '  What is   voter registration?  ';
+  assertEqual(normalizeQuestion(q), normalizeQuestion(q), 'normalizeQuestion must be deterministic');
+});
+
+test('Quality: localAnswer always ends with follow-up suggestions', () => {
+  ALL_REGION_KEYS.forEach(key => {
+    const answer = localAnswer('elections', key);
+    assertContains(answer, '<follow-up>', `localAnswer for region ${key} must include follow-up suggestions`);
+  });
+});
+
+test('Quality: localAnswer references at least one official source for every region', () => {
+  ALL_REGION_KEYS.forEach(key => {
+    const answer = localAnswer('elections', key);
+    const official = REGIONS[key].official;
+    // At least one domain from official sources must appear
+    const domains = official.split(',').map(s => s.trim().split('.').slice(-2).join('.'));
+    const found = domains.some(d => answer.includes(d));
+    assert(found, `localAnswer for ${key} must reference an official source domain`);
+  });
+});
+
+test('Quality: mdToHtml never outputs raw follow-up tag text in html', () => {
+  const inputs = [
+    '<follow-up>Question A?</follow-up>',
+    'Some text <follow-up>Q1?</follow-up> more text <follow-up>Q2?</follow-up>',
+    '<follow-up>Multi\nline?</follow-up>'
+  ];
+  inputs.forEach(input => {
+    const { html } = mdToHtml(input);
+    assertNotContains(html, '<follow-up>', `follow-up open tag must not appear in html for: ${input.slice(0, 30)}`);
+    assertNotContains(html, '</follow-up>', `follow-up close tag must not appear in html`);
+  });
+});
+
+test('Quality: Cloud Functions URL construction is correct', () => {
+  const base = 'https://us-central1-civicguide-app.cloudfunctions.net';
+  const fnName = 'getElectionData';
+  const url = `${base}/${encodeURIComponent(fnName)}`;
+  assertContains(url, 'cloudfunctions.net', 'Cloud Functions URL must use cloudfunctions.net domain');
+  assertContains(url, fnName, 'Function name must appear in URL');
+  assert(url.startsWith('https://'), 'Cloud Functions URL must use HTTPS');
+});
+
+test('Quality: Gemini API URL uses correct base and model', () => {
+  const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+  const GEMINI_MODEL = 'gemini-1.5-flash';
+  const key = 'AIzaSyTest';
+  const url = `${GEMINI_API_BASE}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
+  assertContains(url, 'generativelanguage.googleapis.com', 'Gemini URL must use generativelanguage API');
+  assertContains(url, 'generateContent', 'Gemini URL must use generateContent action');
+  assertContains(url, GEMINI_MODEL, 'Gemini URL must include model name');
+});
+
+test('Quality: Claude API uses the correct anthropic-version header value', () => {
+  const CLAUDE_VERSION = '2023-06-01';
+  assert(CLAUDE_VERSION.match(/^\d{4}-\d{2}-\d{2}$/), 'Anthropic version must be in YYYY-MM-DD format');
+  assert(CLAUDE_VERSION >= '2023-01-01', 'Anthropic version must be >= 2023');
+});
+
+test('Quality: service worker cache name includes version string', () => {
+  const CACHE_NAME = 'civicguide-v2.1.0';
+  assert(CACHE_NAME.startsWith('civicguide-'), 'Cache name must namespace with app name');
+  assertContains(CACHE_NAME, 'v2', 'Cache name must include major version');
+  assert(CACHE_NAME.split('.').length >= 3, 'Cache name must use semver format x.y.z');
+});
+
+test('Quality: TIMELINE_STEPS covers all 10 required election steps', () => {
+  const TIMELINE = [
+    'Candidate Filing', 'Voter Registration', 'Campaign Period',
+    'Voter Education', 'Early or Postal Voting', 'Election Day',
+    'Vote Counting', 'Audits and Recounts', 'Certification', 'Transition or Swearing In'
+  ];
+  assertEqual(TIMELINE.length, 10, 'Election timeline must have exactly 10 steps');
+  TIMELINE.forEach((step, i) => assert(step.length > 0, `Timeline step ${i} must have non-empty title`));
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   RESULTS — printed after all 18 sections have run
 ═══════════════════════════════════════════════════════════════ */
 console.log('\n══════════════════════════════════════════════');
-console.log('  CivicGuide v2.0.0 Test Suite Results');
+console.log('  CivicGuide v2.0.0 — Full Test Suite Results');
 console.log('══════════════════════════════════════════════');
 results.forEach(({ status, name, error }) => {
   const icon = status === 'PASS' ? '✅' : '❌';

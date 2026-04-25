@@ -4,7 +4,7 @@
  * Integrates with Firebase for push notifications (future extension).
  */
 
-const CACHE_NAME = 'civicguide-v2.0.0';
+const CACHE_NAME = 'civicguide-v2.1.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -46,13 +46,17 @@ self.addEventListener('fetch', (event) => {
   // Never intercept third-party API calls (Anthropic, Google APIs, Firebase)
   const passThrough = [
     'api.anthropic.com',
-    'googleapis.com',
+    'googleapis.com',       // Maps, Civic, BigQuery, NLP, Gemini APIs
     'gstatic.com',
     'firebase',
     'firestore',
     'fonts.googleapis.com',
     'translate.google.com',
-    'maps.googleapis.com'
+    'maps.googleapis.com',
+    'language.googleapis.com',      // Cloud Natural Language API
+    'bigquery.googleapis.com',      // BigQuery Streaming Inserts
+    'generativelanguage.googleapis.com', // Gemini (Vertex AI)
+    'cloudfunctions.net'            // Cloud Functions
   ];
   if (passThrough.some((domain) => url.hostname.includes(domain))) return;
 

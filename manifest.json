@@ -1,7 +1,7 @@
 {
-  "name": "CivicGuide — Election Process Assistant",
+  "name": "CivicGuide \u2014 Election Process Assistant",
   "short_name": "CivicGuide",
-  "description": "AI-powered election education assistant. Understand voter registration, ballot counting, the Electoral College, and more.",
+  "description": "AI-powered election education assistant. Understand voter registration, ballot counting, the Electoral College, and more. Features Google Maps polling place finder, Google Civic API, Firebase Analytics, and Claude AI with offline fallback.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0D1B2A",
@@ -21,7 +21,11 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "government", "utilities"],
+  "categories": [
+    "education",
+    "government",
+    "utilities"
+  ],
   "lang": "en",
   "dir": "ltr",
   "screenshots": [
@@ -30,5 +34,6 @@
       "sizes": "1200x630",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "version": "2.1.0"
 }

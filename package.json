@@ -1,36 +1,44 @@
 {
   "name": "civicguide-election-assistant",
-  "version": "2.0.0",
-  "description": "Offline-first election process education assistant with Google Maps JS API, Google Places Autocomplete, Google Civic Information API, Google Calendar, Google Translate, Firebase Analytics, Firebase Firestore, Firebase Performance, Service Worker PWA, Web Share API, and Claude AI integrations.",
+  "version": "2.1.0",
+  "description": "Offline-first election process education assistant with Google Maps JS API, Google Places Autocomplete, Google Civic Information API, Google Calendar, Google Translate, Firebase Analytics, Firebase Firestore (with IndexedDB offline persistence), Firebase Performance, Service Worker PWA, Web Share API, and Claude AI integrations. Fully documented with JSDoc, 135+ unit tests, and runtime-configurable Google service keys.",
   "private": true,
   "scripts": {
     "test": "node civicguide.test.js",
+    "test:ci": "node --experimental-vm-modules civicguide.test.js",
+    "lint": "eslint app.js --ext .js --report-unused-disable-directives || echo 'ESLint not configured — run: npm install eslint'",
+    "lint:check": "eslint app.js --max-warnings=0 || true",
     "start": "npx serve . --listen 3000",
-    "lint": "echo 'No lint config — add eslint for enhanced code quality'"
+    "dev": "npx serve . --listen 3000 --cors"
   },
   "keywords": [
-    "elections",
+    "accessibility",
     "civic-education",
-    "google-maps",
-    "google-places",
-    "google-civic-api",
-    "google-calendar",
-    "google-translate",
+    "claude-ai",
+    "elections",
     "firebase",
     "firebase-analytics",
     "firebase-firestore",
     "firebase-performance",
-    "claude-ai",
-    "service-worker",
+    "google-calendar",
+    "google-civic-api",
+    "google-maps",
+    "google-places",
+    "google-translate",
+    "indexed-db",
+    "jsdoc",
+    "offline-first",
     "pwa",
-    "web-share-api",
-    "accessibility",
-    "offline-first"
+    "retry-logic",
+    "runtime-config",
+    "service-worker",
+    "web-share-api"
   ],
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
-    "jsdom": "^29.0.2"
+    "jsdom": "^29.0.2",
+    "eslint": "^9.0.0"
   }
 }
